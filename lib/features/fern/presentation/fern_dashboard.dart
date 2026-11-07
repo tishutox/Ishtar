@@ -294,17 +294,19 @@ class _FernDashboardState extends State<FernDashboard> {
               padding: const EdgeInsets.fromLTRB(8, 8, 12, 12),
               child: Row(
                 children: [
-                  TextButton(
+                  FilledButton(
                     onPressed: () => context.push('/settings'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      shape: const StadiumBorder(),
+                    ),
                     child: const Text(
                       'Settings',
-                      style: TextStyle(
-                        color: Color(0xFF1A1A1A),
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const Spacer(),
                   _buildAvatar(),
                 ],
               ),
