@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 const Color fernLilac = Color(0xFF8B5CF6);
+const Color fernNsfwRed = Color(0xFFE53935);
 
 /// Local-only chat with Fern, the built-in AI assistant.
 ///
@@ -45,6 +46,7 @@ class _FernPageState extends State<FernPage> {
   late List<FernMessage> _messages;
   bool _sending = false;
   bool _downloadingModel = false;
+  bool _isDownloaded = false;
   bool _isRecording = false;
   bool _showAttachMenu = false;
   final List<double> _amplitudes = [];
@@ -64,6 +66,7 @@ class _FernPageState extends State<FernPage> {
     _messages = List.of(widget.conversation.messages);
     _controller.addListener(_handleTextChanged);
     unawaited(_checkCrashLog());
+    unawaited(_refreshDownloadedState());
   }
 
   @override
@@ -140,6 +143,11 @@ class _FernPageState extends State<FernPage> {
     );
   }
 
+  Future<void> _refreshDownloadedState() async {
+    final downloaded = await LocalLlmService.instance.isDownloaded();
+    if (mounted) setState(() => _isDownloaded = downloaded);
+  }
+
   Future<void> _toggleLocalModel() async {
     final service = LocalLlmService.instance;
     if (service.useLocal) {
@@ -153,6 +161,7 @@ class _FernPageState extends State<FernPage> {
       final ok = await service.ensureLoaded();
       if (mounted) {
         setState(() {
+          _isDownloaded = true;
           if (ok) service.useLocal = true;
         });
         if (!ok) _showSnack('Could not load the local model.');
@@ -462,6 +471,7 @@ class _FernPageState extends State<FernPage> {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureInputArea());
+    final useLocal = LocalLlmService.instance.useLocal;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -471,13 +481,13 @@ class _FernPageState extends State<FernPage> {
         ),
         actions: [
           IconButton(
-            tooltip: LocalLlmService.instance.useLocal
+            tooltip: useLocal
                 ? 'Deactivate NSFW (cloud)'
                 : 'Activate NSFW (local)',
             onPressed: _toggleLocalModel,
-            style: LocalLlmService.instance.useLocal
+            style: useLocal
                 ? IconButton.styleFrom(
-                    backgroundColor: fernLilac.withValues(alpha: 0.18),
+                    backgroundColor: fernNsfwRed.withValues(alpha: 0.18),
                   )
                 : null,
             icon: _downloadingModel
@@ -486,14 +496,12 @@ class _FernPageState extends State<FernPage> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: fernLilac,
+                      color: fernNsfwRed,
                     ),
                   )
                 : AppIcon(
-                    LocalLlmService.instance.useLocal
-                        ? AppIcons.ban
-                        : AppIcons.arrowBigDownDash,
-                    color: LocalLlmService.instance.useLocal ? fernLilac : null,
+                    _isDownloaded ? AppIcons.ban : AppIcons.arrowBigDownDash,
+                    color: useLocal ? fernNsfwRed : null,
                   ),
           ),
           IconButton(

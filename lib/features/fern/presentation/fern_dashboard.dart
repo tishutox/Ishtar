@@ -191,7 +191,7 @@ class _FernDashboardState extends State<FernDashboard> {
 
     final active = _active;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final sidebarWidth = (screenWidth * 0.86).clamp(0.0, 340.0).toDouble();
+    final sidebarWidth = (screenWidth * 0.80).clamp(0.0, 300.0).toDouble();
 
     return Scaffold(
       body: Stack(
@@ -205,21 +205,39 @@ class _FernDashboardState extends State<FernDashboard> {
                   onToggleSidebar: _toggleSidebar,
                   onNewChat: _newChat,
                 ),
-          if (_sidebarOpen) ...[
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _toggleSidebar,
-                child: ColoredBox(color: Colors.black.withValues(alpha: 0.3)),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_sidebarOpen,
+              child: AnimatedOpacity(
+                opacity: _sidebarOpen ? 1 : 0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                child: GestureDetector(
+                  onTap: _toggleSidebar,
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.3),
+                  ),
+                ),
               ),
             ),
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: sidebarWidth,
-              child: _buildSidebar(context, sidebarWidth),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: sidebarWidth,
+            child: AnimatedSlide(
+              offset: _sidebarOpen ? Offset.zero : const Offset(-1, 0),
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                  right: Radius.circular(24),
+                ),
+                child: _buildSidebar(context, sidebarWidth),
+              ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -235,7 +253,7 @@ class _FernDashboardState extends State<FernDashboard> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
@@ -243,13 +261,17 @@ class _FernDashboardState extends State<FernDashboard> {
                   prefixIcon: const AppIcon(AppIcons.search, size: 18),
                   prefixIconConstraints: const BoxConstraints(
                     minWidth: 40,
-                    minHeight: 40,
+                    minHeight: 36,
                   ),
                   isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   filled: true,
                   fillColor: _searchFill,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(999),
                     borderSide: BorderSide.none,
                   ),
                 ),
