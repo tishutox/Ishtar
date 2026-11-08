@@ -183,9 +183,7 @@ class _FernPageState extends State<FernPage> {
     if (_downloadingModel) return;
     setState(() => _downloadingModel = true);
     try {
-      final ok = await service.ensureLoaded(
-        uncensored: _aiType.usesUncensoredModel,
-      );
+      final ok = await service.ensureLoaded(uncensored: true);
       if (mounted) {
         final downloaded = await service.isDownloaded();
         setState(() {

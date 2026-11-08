@@ -78,6 +78,22 @@ if(vulkan-lib)
         FetchContent_Populate(vulkan_headers)
     endif()
     include_directories(BEFORE SYSTEM ${vulkan_headers_SOURCE_DIR}/include)
+
+    # ggml-vulkan also does find_package(SPIRV-Headers CONFIG) and includes
+    # <spirv/unified1/spirv.hpp>. The LunarG Vulkan SDK normally provides the
+    # config package; fetch SPIRV-Headers and supply a minimal config instead.
+    FetchContent_Declare(spirv_headers GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git GIT_TAG vulkan-sdk-1.4.309.0 GIT_SHALLOW TRUE)
+    FetchContent_GetProperties(spirv_headers)
+    if(NOT spirv_headers_POPULATED)
+        FetchContent_Populate(spirv_headers)
+    endif()
+    include_directories(BEFORE SYSTEM ${spirv_headers_SOURCE_DIR}/include)
+    set(_spirv_headers_config_dir "${CMAKE_BINARY_DIR}/spirv-headers-config")
+    file(MAKE_DIRECTORY "${_spirv_headers_config_dir}")
+    file(WRITE "${_spirv_headers_config_dir}/SPIRV-HeadersConfig.cmake"
+        "set(SPIRV-Headers_INCLUDE_DIRS \"${spirv_headers_SOURCE_DIR}/include\")\n")
+    set(SPIRV-Headers_DIR "${_spirv_headers_config_dir}" CACHE PATH "" FORCE)
+
     message(STATUS "🚀 Vulkan GPU acceleration ENABLED")
     message(STATUS "   Supported: Adreno 5xx+, Mali-G71+, Samsung Exynos 9+")
     message(STATUS "   Expected: 4-8x faster than CPU")

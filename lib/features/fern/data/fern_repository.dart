@@ -256,12 +256,9 @@ class FernRepository {
     ];
     try {
       final String title;
-      if (LocalLlmService.instance.useLocal) {
-        final aiType = await loadAiType();
-        title = await _sendLocal(
-          messages,
-          uncensored: aiType.usesUncensoredModel,
-        );
+      final aiType = await loadAiType();
+      if (LocalLlmService.instance.useLocal && aiType.usesUncensoredModel) {
+        title = await _sendLocal(messages, uncensored: true);
       } else if (_apiKey.isNotEmpty) {
         title = await _sendToOllama(messages);
       } else {
@@ -322,8 +319,10 @@ class FernRepository {
       {'role': 'user', 'content': boundedUser},
     ];
 
-    if (LocalLlmService.instance.useLocal) {
-      return _sendLocal(messages, uncensored: aiType.usesUncensoredModel);
+    // Only the NSFW-capable types (roleplay / lover-erotic) use the on-device
+    // model; every other type goes to the fast cloud.
+    if (LocalLlmService.instance.useLocal && aiType.usesUncensoredModel) {
+      return _sendLocal(messages, uncensored: true);
     }
     if (_apiKey.isNotEmpty) {
       return _sendToOllama(messages);
