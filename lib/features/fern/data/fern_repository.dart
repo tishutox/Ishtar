@@ -312,7 +312,12 @@ class FernRepository {
 
     final aiType = await loadAiType();
     final messages = [
-      {'role': 'system', 'content': '$_systemPrompt\n\n${aiType.directive}'},
+      {
+        'role': 'system',
+        'content':
+            '$_systemPrompt\n\n${aiType.directive}\n\n'
+            'Your knowledge is current as of 2024.',
+      },
       ...boundedHistory.reversed,
       {'role': 'user', 'content': boundedUser},
     ];

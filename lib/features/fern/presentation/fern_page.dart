@@ -162,6 +162,7 @@ class _FernPageState extends State<FernPage> {
   Future<void> _openAiSettings() async {
     final selected = await showModalBottomSheet<AiType>(
       context: context,
+      backgroundColor: Colors.white,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) => _AiTypeSheet(initial: _aiType),
@@ -225,6 +226,9 @@ class _FernPageState extends State<FernPage> {
       _generating = true;
     });
     _abortRequested = false;
+    // Persist the user message immediately so the chat is saved even if the
+    // reply is slow or fails.
+    _persist();
     _scrollToBottom();
 
     String? reply;
@@ -289,6 +293,10 @@ class _FernPageState extends State<FernPage> {
     if (!_generating) return;
     _abortRequested = true;
     _repository.cancelActiveRequest();
+    // Give immediate visual feedback: rotate the stop button back to normal.
+    // The on-device model cannot be interrupted mid-decode, but the reply is
+    // discarded once it finishes.
+    setState(() => _generating = false);
   }
 
   Future<String> _mediaDir() async {
@@ -663,7 +671,7 @@ class _FernPageState extends State<FernPage> {
   }
 }
 
-class _FernMediaInputBar extends StatefulWidget {
+class _FernMediaInputBar extends StatelessWidget {
   const _FernMediaInputBar({
     required this.controller,
     required this.isSending,
@@ -685,56 +693,10 @@ class _FernMediaInputBar extends StatefulWidget {
   final Future<void> Function() onToggleRecording;
 
   @override
-  State<_FernMediaInputBar> createState() => _FernMediaInputBarState();
-}
-
-class _FernMediaInputBarState extends State<_FernMediaInputBar>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _spinController;
-  late final Animation<double> _spin;
-
-  @override
-  void initState() {
-    super.initState();
-    _spinController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _spin = _spinController.drive(
-      Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: Curves.linear)),
-    );
-    _syncSpin();
-  }
-
-  @override
-  void didUpdateWidget(covariant _FernMediaInputBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isGenerating != widget.isGenerating) {
-      _syncSpin();
-    }
-  }
-
-  void _syncSpin() {
-    if (widget.isGenerating) {
-      if (!_spinController.isAnimating) _spinController.repeat();
-    } else {
-      _spinController.stop();
-      _spinController.reset();
-    }
-  }
-
-  @override
-  void dispose() {
-    _spinController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final surface = Theme.of(context).colorScheme.surfaceContainerHighest;
-    final hasText = widget.controller.text.trim().isNotEmpty;
-    final isGenerating = widget.isGenerating;
+    final hasText = controller.text.trim().isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -748,12 +710,11 @@ class _FernMediaInputBarState extends State<_FernMediaInputBar>
           children: [
             Expanded(
               child: TextField(
-                controller: widget.controller,
+                controller: controller,
                 minLines: 1,
                 maxLines: 4,
-                enabled: !widget.isSending,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => widget.onSend(),
+                onSubmitted: (_) => onSend(),
                 decoration: const InputDecoration(
                   hintText: 'Message Fern',
                   border: InputBorder.none,
@@ -767,49 +728,47 @@ class _FernMediaInputBarState extends State<_FernMediaInputBar>
                 ),
               ),
             ),
-            if (hasText)
+            if (isGenerating)
+              AnimatedRotation(
+                turns: 0.125,
+                duration: const Duration(milliseconds: 200),
+                child: _CircleIconButton(
+                  tooltip: 'Stop',
+                  icon: AppIcons.circlePlus,
+                  backgroundColor: primary,
+                  iconColor: Colors.white,
+                  onPressed: onCancel,
+                ),
+              )
+            else if (hasText)
               _CircleIconButton(
                 tooltip: 'Send',
-                icon: widget.isSending
+                icon: isSending
                     ? AppIcons.loaderCircle
                     : AppIcons.sendHorizontal,
                 backgroundColor: primary,
                 iconColor: Colors.white,
-                onPressed: widget.isSending ? null : widget.onSend,
+                onPressed: isSending ? null : onSend,
               )
             else ...[
               IconButton(
                 tooltip: 'Voice message',
-                onPressed: widget.isSending ? null : widget.onToggleRecording,
+                onPressed: isSending ? null : onToggleRecording,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 icon: AppIcon(AppIcons.mic, color: primary),
               ),
-              if (isGenerating)
-                RotationTransition(
-                  turns: _spin,
-                  child: _CircleIconButton(
-                    tooltip: 'Stop',
-                    icon: AppIcons.circlePlus,
-                    backgroundColor: primary,
-                    iconColor: Colors.white,
-                    onPressed: widget.onCancel,
-                  ),
-                )
-              else
-                AnimatedRotation(
-                  turns: widget.showAttachMenu ? 0.125 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: _CircleIconButton(
-                    tooltip: 'Attach',
-                    icon: AppIcons.circlePlus,
-                    backgroundColor: primary,
-                    iconColor: Colors.white,
-                    onPressed: widget.isSending
-                        ? null
-                        : widget.onToggleAttachMenu,
-                  ),
+              AnimatedRotation(
+                turns: showAttachMenu ? 0.125 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: _CircleIconButton(
+                  tooltip: 'Attach',
+                  icon: AppIcons.circlePlus,
+                  backgroundColor: primary,
+                  iconColor: Colors.white,
+                  onPressed: isSending ? null : onToggleAttachMenu,
                 ),
+              ),
             ],
           ],
         ),

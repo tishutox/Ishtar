@@ -173,7 +173,7 @@ class LocalLlmService {
         temperature: 0.8,
         topP: 0.95,
         topK: 40,
-        maxTokens: 256,
+        maxTokens: 512,
         repeatPenalty: 1.1,
       ),
     );

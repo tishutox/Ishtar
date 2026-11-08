@@ -245,10 +245,10 @@ class _FernDashboardState extends State<FernDashboard> {
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Search chat content...',
-                      prefixIcon: const AppIcon(AppIcons.search, size: 14),
+                      prefixIcon: const AppIcon(AppIcons.search, size: 24),
                       prefixIconConstraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 32,
+                        minWidth: 24,
+                        minHeight: 24,
                       ),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
@@ -280,7 +280,7 @@ class _FernDashboardState extends State<FernDashboard> {
                     ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
