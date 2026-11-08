@@ -48,7 +48,6 @@ class _FernPageState extends State<FernPage> {
   bool _abortRequested = false;
   int _generationId = 0;
   bool _downloadingModel = false;
-  bool _isDownloaded = false;
   bool _isRecording = false;
   bool _showAttachMenu = false;
   final List<double> _amplitudes = [];
@@ -69,7 +68,6 @@ class _FernPageState extends State<FernPage> {
     _messages = List.of(widget.conversation.messages);
     _controller.addListener(_handleTextChanged);
     unawaited(_checkCrashLog());
-    unawaited(_refreshDownloadedState());
     unawaited(_loadAiType());
     // When a chat is opened (or switched to), start at the latest message
     // instead of the top of the history.
@@ -150,11 +148,6 @@ class _FernPageState extends State<FernPage> {
     );
   }
 
-  Future<void> _refreshDownloadedState() async {
-    final downloaded = await LocalLlmService.instance.isDownloaded();
-    if (mounted) setState(() => _isDownloaded = downloaded);
-  }
-
   Future<void> _loadAiType() async {
     final type = await _repository.loadAiType();
     if (mounted) setState(() => _aiType = type);
@@ -183,13 +176,11 @@ class _FernPageState extends State<FernPage> {
     if (_downloadingModel) return;
     setState(() => _downloadingModel = true);
     try {
-      final ok = await service.ensureLoaded(uncensored: true);
+      final ok = await service.ensureLoaded(
+        uncensored: _aiType.usesUncensoredModel,
+      );
       if (mounted) {
-        final downloaded = await service.isDownloaded();
-        setState(() {
-          _isDownloaded = downloaded;
-          if (ok) service.useLocal = true;
-        });
+        if (ok) setState(() => service.useLocal = true);
         if (!ok) _showSnack('Could not load the local model.');
       }
     } catch (error) {
@@ -549,9 +540,7 @@ class _FernPageState extends State<FernPage> {
         ),
         actions: [
           IconButton(
-            tooltip: useLocal
-                ? 'Deactivate NSFW (cloud)'
-                : 'Activate NSFW (local)',
+            tooltip: useLocal ? 'Switch to cloud model' : 'Use on-device model',
             onPressed: _toggleLocalModel,
             style: useLocal
                 ? IconButton.styleFrom(
@@ -568,7 +557,7 @@ class _FernPageState extends State<FernPage> {
                     ),
                   )
                 : AppIcon(
-                    _isDownloaded ? AppIcons.ban : AppIcons.arrowBigDownDash,
+                    useLocal ? AppIcons.shieldKeyhole : AppIcons.cloud,
                     color: useLocal ? fernNsfwRed : null,
                   ),
           ),

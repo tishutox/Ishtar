@@ -55,9 +55,10 @@ class LocalLlmService {
     return File('${dir.path}/$fileName');
   }
 
-  /// Whether the roleplay (NSFW-capable) model has finished downloading.
+  /// Whether a local model (knowledge or roleplay) has finished downloading.
   Future<bool> isDownloaded() async =>
-      (await _modelFile(_roleplayModelFileName)).existsSync();
+      (await _modelFile(_roleplayModelFileName)).existsSync() ||
+      (await _modelFile(_knowledgeModelFileName)).existsSync();
 
   /// Downloads [url] into [file], reporting [onProgress] (0..1).
   Future<File> _download(
@@ -138,7 +139,7 @@ class LocalLlmService {
     final ok = await _llama.loadModel(
       LlamaConfig(
         modelPath: file.path,
-        nThreads: 8,
+        nThreads: 4,
         nGpuLayers: 0, // CPU-only (Vulkan build not yet working on Windows)
         contextSize: 4096,
         batchSize:

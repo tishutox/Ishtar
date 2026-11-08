@@ -24,6 +24,7 @@ abstract final class AppIcons {
   static const chevronRight = 'chevron-right';
   static const circlePlus = 'circle-plus';
   static const circleUserRound = 'circle-user-round';
+  static const cloud = 'cloud';
   static const code = 'code';
   static const compass = 'compass';
   static const cpu = 'cpu';
@@ -87,6 +88,7 @@ abstract final class AppIcons {
   static const send = 'send';
   static const sendHorizontal = 'send-horizontal';
   static const settings = 'settings';
+  static const shieldKeyhole = 'shield-keyhole';
   static const sticker = 'sticker';
   static const toolCase = 'tool-case';
   static const trash = 'trash';
