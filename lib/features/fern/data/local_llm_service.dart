@@ -15,11 +15,12 @@ class LocalLlmService {
   LocalLlmService._();
   static final LocalLlmService instance = LocalLlmService._();
 
-  /// Broad knowledge model (Qwen2.5-7B-Instruct, Q4_K_M, ~4.7 GB). More recent
-  /// and much wider knowledge than the roleplay model.
+  /// Broad knowledge model (Qwen2.5-3B-Instruct, Q4_K_M, ~1.9 GB). Much faster
+  /// than 7B on CPU while keeping a ~2024 knowledge cutoff.
   static const String knowledgeModelUrl =
-      'https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf';
-  static const String _knowledgeModelFileName = 'fern_knowledge_v1.gguf';
+      'https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf';
+  static const String _knowledgeModelFileName = 'fern_knowledge_v2.gguf';
+  static const String _oldKnowledgeModelFileName = 'fern_knowledge_v1.gguf';
 
   /// Uncensored roleplay model (Hermes-3, 3B) kept for NSFW roleplay. Reuses
   /// the existing file name so users who already downloaded it keep it.
@@ -115,11 +116,13 @@ class LocalLlmService {
     // Free space left over from a previously switched model.
     if (!file.existsSync()) {
       final dir = await getApplicationDocumentsDirectory();
-      final legacy = File('${dir.path}/$_legacyModelFileName');
-      if (legacy.existsSync()) {
-        try {
-          await legacy.delete();
-        } catch (_) {}
+      for (final stale in [_legacyModelFileName, _oldKnowledgeModelFileName]) {
+        final staleFile = File('${dir.path}/$stale');
+        if (staleFile.existsSync()) {
+          try {
+            await staleFile.delete();
+          } catch (_) {}
+        }
       }
     }
 
@@ -135,7 +138,7 @@ class LocalLlmService {
     final ok = await _llama.loadModel(
       LlamaConfig(
         modelPath: file.path,
-        nThreads: 4,
+        nThreads: 8,
         nGpuLayers: 0, // CPU-only for broad device compatibility
         contextSize: 4096,
         batchSize:
@@ -173,7 +176,7 @@ class LocalLlmService {
         temperature: 0.8,
         topP: 0.95,
         topK: 40,
-        maxTokens: 512,
+        maxTokens: 448,
         repeatPenalty: 1.1,
       ),
     );
