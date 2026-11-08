@@ -6,19 +6,27 @@ import 'package:path_provider/path_provider.dart';
 
 /// On-device LLM inference for Fern (llama.cpp via flutter_llama).
 ///
-/// Downloads a small GGUF model on first use and runs completions locally, so
-/// Fern works without any server or API key. The model URL is a single constant
-/// and can be swapped for any other GGUF (e.g. an abliterated/uncensored model).
+/// Runs one of two GGUF models, selected per AI type:
+/// * the **knowledge** model (Qwen2.5-7B-Instruct) for broad, more recent
+///   knowledge — used for every type except roleplay/lover-erotic;
+/// * the **roleplay** model (Hermes-3), an uncensored model kept so NSFW
+///   roleplay still works.
 class LocalLlmService {
   LocalLlmService._();
   static final LocalLlmService instance = LocalLlmService._();
 
-  /// 3B GGUF (~1.9 GB). Hermes-3 is steerable/uncensored (good for adult
-  /// roleplay); public and ungated. Swap this for another GGUF URL to use a
-  /// different model.
-  static const String modelUrl =
+  /// Broad knowledge model (Qwen2.5-7B-Instruct, Q4_K_M, ~4.7 GB). More recent
+  /// and much wider knowledge than the roleplay model.
+  static const String knowledgeModelUrl =
+      'https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf';
+  static const String _knowledgeModelFileName = 'fern_knowledge_v1.gguf';
+
+  /// Uncensored roleplay model (Hermes-3, 3B) kept for NSFW roleplay. Reuses
+  /// the existing file name so users who already downloaded it keep it.
+  static const String roleplayModelUrl =
       'https://huggingface.co/bartowski/Hermes-3-Llama-3.2-3B-GGUF/resolve/main/Hermes-3-Llama-3.2-3B-Q4_K_M.gguf';
-  static const String _modelFileName = 'fern_model_v2.gguf';
+  static const String _roleplayModelFileName = 'fern_model_v2.gguf';
+
   static const String _legacyModelFileName = 'fern_model.gguf';
 
   FlutterLlama get _llama => FlutterLlama.instance;
@@ -29,8 +37,11 @@ class LocalLlmService {
   /// Whether a model is currently loaded into memory.
   bool get isModelLoaded => _llama.isModelLoaded;
 
-  /// Whether Fern currently uses the on-device (NSFW) model instead of the
-  /// (SFW) cloud fallback. Toggled from the chat app bar.
+  /// Which model is currently loaded: true = roleplay, false = knowledge.
+  bool? _loadedUncensored;
+
+  /// Whether Fern currently uses an on-device model instead of the (SFW) cloud
+  /// fallback. Toggled from the chat app bar.
   bool useLocal = false;
 
   /// Whether Fern keeps its memory between chats. When turned off in Settings
@@ -38,20 +49,24 @@ class LocalLlmService {
   /// generation so each chat starts fresh.
   bool keepMemories = true;
 
-  Future<File> modelFile() async {
+  Future<File> _modelFile(String fileName) async {
     final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/$_modelFileName');
+    return File('${dir.path}/$fileName');
   }
 
-  /// Whether the model file has finished downloading.
-  Future<bool> isDownloaded() async => (await modelFile()).existsSync();
+  /// Whether the roleplay (NSFW-capable) model has finished downloading.
+  Future<bool> isDownloaded() async =>
+      (await _modelFile(_roleplayModelFileName)).existsSync();
 
-  /// Downloads the model, reporting [onProgress] (0..1). Returns the file.
-  Future<File> downloadModel({void Function(double progress)? onProgress}) async {
-    final file = await modelFile();
+  /// Downloads [url] into [file], reporting [onProgress] (0..1).
+  Future<File> _download(
+    String url,
+    File file, {
+    void Function(double progress)? onProgress,
+  }) async {
     final part = File('${file.path}.part');
 
-    final request = http.Request('GET', Uri.parse(modelUrl));
+    final request = http.Request('GET', Uri.parse(url));
     final client = http.Client();
     final streamed = await client.send(request);
     final total = streamed.contentLength ?? 0;
@@ -79,11 +94,25 @@ class LocalLlmService {
     return file;
   }
 
-  /// Downloads (if needed) and loads the model into memory.
-  Future<bool> ensureLoaded({void Function(double progress)? onProgress}) async {
-    if (isModelLoaded) return true;
-    final file = await modelFile();
-    // Free space from the previous model when the model was switched.
+  /// Downloads (if needed) and loads the model for [uncensored] into memory.
+  ///
+  /// [uncensored] = true selects the roleplay (Hermes-3) model, false selects
+  /// the knowledge (Qwen2.5) model. Switching models unloads the previous one.
+  Future<bool> ensureLoaded({
+    required bool uncensored,
+    void Function(double progress)? onProgress,
+  }) async {
+    if (_llama.isModelLoaded && _loadedUncensored == uncensored) {
+      return true;
+    }
+
+    final fileName = uncensored
+        ? _roleplayModelFileName
+        : _knowledgeModelFileName;
+    final url = uncensored ? roleplayModelUrl : knowledgeModelUrl;
+    final file = await _modelFile(fileName);
+
+    // Free space left over from a previously switched model.
     if (!file.existsSync()) {
       final dir = await getApplicationDocumentsDirectory();
       final legacy = File('${dir.path}/$_legacyModelFileName');
@@ -93,34 +122,54 @@ class LocalLlmService {
         } catch (_) {}
       }
     }
+
     if (!file.existsSync()) {
-      await downloadModel(onProgress: onProgress);
+      await _download(url, file, onProgress: onProgress);
     }
-    return _llama.loadModel(
+
+    if (_llama.isModelLoaded) {
+      await _llama.unloadModel();
+      _loadedUncensored = null;
+    }
+
+    final ok = await _llama.loadModel(
       LlamaConfig(
         modelPath: file.path,
         nThreads: 4,
         nGpuLayers: 0, // CPU-only for broad device compatibility
         contextSize: 4096,
-        batchSize: 4096, // must be >= the full prompt (system + history) or llama.cpp aborts
+        batchSize:
+            4096, // must be >= the full prompt (system + history) or llama.cpp aborts
         useGpu: false,
         verbose: false,
       ),
     );
+    if (ok) {
+      _loadedUncensored = uncensored;
+    }
+    return ok;
   }
 
-  /// Runs a chat completion with the loaded model.
+  /// Runs a chat completion with the model matching [uncensored].
   ///
   /// Uses the 1.1 `generate` path (the 1.2 chat engine needs native `core.*`
-  /// methods the Android plugin does not implement) and applies the Llama-3.2
-  /// chat template manually.
-  Future<String> chat(List<Map<String, String>> messages) async {
+  /// methods the Android plugin does not implement) and applies the chat
+  /// template of the selected model manually.
+  Future<String> chat(
+    List<Map<String, String>> messages, {
+    required bool uncensored,
+  }) async {
     if (!keepMemories) {
       await _llama.clearContext();
     }
+    if (!_llama.isModelLoaded || _loadedUncensored != uncensored) {
+      await ensureLoaded(uncensored: uncensored);
+    }
     final response = await _llama.generate(
       GenerationParams(
-        prompt: _renderLlama32Prompt(messages),
+        prompt: uncensored
+            ? _renderLlama32Prompt(messages)
+            : _renderQwenPrompt(messages),
         temperature: 0.8,
         topP: 0.95,
         topK: 40,
@@ -131,14 +180,29 @@ class LocalLlmService {
     return response.text.trim();
   }
 
+  /// Chat template for the Llama-based roleplay model (Hermes-3).
   String _renderLlama32Prompt(List<Map<String, String>> messages) {
     final buffer = StringBuffer('<|begin_of_text|>');
     for (final m in messages) {
       final role = m['role'] ?? 'user';
       final content = m['content'] ?? '';
-      buffer.write('<|start_header_id|>$role<|end_header_id|>\n\n$content<|eot_id|>');
+      buffer.write(
+        '<|start_header_id|>$role<|end_header_id|>\n\n$content<|eot_id|>',
+      );
     }
     buffer.write('<|start_header_id|>assistant<|end_header_id|>\n\n');
+    return buffer.toString();
+  }
+
+  /// Chat template for the Qwen2.5 knowledge model.
+  String _renderQwenPrompt(List<Map<String, String>> messages) {
+    final buffer = StringBuffer();
+    for (final m in messages) {
+      final role = m['role'] ?? 'user';
+      final content = m['content'] ?? '';
+      buffer.write('<|im_start|>$role\n$content<|im_end|>\n');
+    }
+    buffer.write('<|im_start|>assistant\n');
     return buffer.toString();
   }
 

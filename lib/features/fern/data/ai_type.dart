@@ -167,4 +167,9 @@ enum AiType {
   final String label;
   final String description;
   final String directive;
+
+  /// Whether this type uses the uncensored (Hermes-3) local model so NSFW
+  /// roleplay keeps working, instead of the knowledge model.
+  bool get usesUncensoredModel =>
+      this == AiType.roleplay || this == AiType.loverErotic;
 }

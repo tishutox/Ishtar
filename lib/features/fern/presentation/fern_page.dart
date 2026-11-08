@@ -181,10 +181,13 @@ class _FernPageState extends State<FernPage> {
     if (_downloadingModel) return;
     setState(() => _downloadingModel = true);
     try {
-      final ok = await service.ensureLoaded();
+      final ok = await service.ensureLoaded(
+        uncensored: _aiType.usesUncensoredModel,
+      );
       if (mounted) {
+        final downloaded = await service.isDownloaded();
         setState(() {
-          _isDownloaded = true;
+          _isDownloaded = downloaded;
           if (ok) service.useLocal = true;
         });
         if (!ok) _showSnack('Could not load the local model.');

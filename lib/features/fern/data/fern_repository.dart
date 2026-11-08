@@ -256,9 +256,12 @@ class FernRepository {
     ];
     try {
       final String title;
-      if (LocalLlmService.instance.useLocal &&
-          LocalLlmService.instance.isModelLoaded) {
-        title = await _sendLocal(messages);
+      if (LocalLlmService.instance.useLocal) {
+        final aiType = await loadAiType();
+        title = await _sendLocal(
+          messages,
+          uncensored: aiType.usesUncensoredModel,
+        );
       } else if (_apiKey.isNotEmpty) {
         title = await _sendToOllama(messages);
       } else {
@@ -314,9 +317,8 @@ class FernRepository {
       {'role': 'user', 'content': boundedUser},
     ];
 
-    if (LocalLlmService.instance.useLocal &&
-        LocalLlmService.instance.isModelLoaded) {
-      return _sendLocal(messages);
+    if (LocalLlmService.instance.useLocal) {
+      return _sendLocal(messages, uncensored: aiType.usesUncensoredModel);
     }
     if (_apiKey.isNotEmpty) {
       return _sendToOllama(messages);
@@ -324,8 +326,11 @@ class FernRepository {
     return _sendToPollinations(messages);
   }
 
-  Future<String> _sendLocal(List<Map<String, String>> messages) async {
-    return LocalLlmService.instance.chat(messages);
+  Future<String> _sendLocal(
+    List<Map<String, String>> messages, {
+    required bool uncensored,
+  }) async {
+    return LocalLlmService.instance.chat(messages, uncensored: uncensored);
   }
 
   Future<String> _sendToOllama(List<Map<String, String>> messages) async {
