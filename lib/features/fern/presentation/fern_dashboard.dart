@@ -313,11 +313,11 @@ class _FernDashboardState extends State<FernDashboard> {
       borderRadius: BorderRadius.circular(999),
       onTap: () => context.push('/own-profile'),
       child: CircleAvatar(
-        radius: 16,
+        radius: 20,
         backgroundColor: const Color(0xFFE4E4E8),
         backgroundImage: avatarUrl == null ? null : NetworkImage(avatarUrl),
         child: avatarUrl == null
-            ? const AppIcon(AppIcons.circleUserRound, size: 18)
+            ? const AppIcon(AppIcons.circleUserRound, size: 22)
             : null,
       ),
     );

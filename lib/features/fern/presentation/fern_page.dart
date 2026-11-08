@@ -46,6 +46,7 @@ class _FernPageState extends State<FernPage> {
   bool _sending = false;
   bool _generating = false;
   bool _abortRequested = false;
+  int _generationId = 0;
   bool _downloadingModel = false;
   bool _isDownloaded = false;
   bool _isRecording = false;
@@ -216,6 +217,8 @@ class _FernPageState extends State<FernPage> {
     final shouldTitle = _messages.isEmpty && widget.conversation.title.isEmpty;
     _controller.clear();
 
+    final generationId = ++_generationId;
+
     final history = List<FernMessage>.of(_messages);
     setState(() {
       _messages = [
@@ -239,7 +242,7 @@ class _FernPageState extends State<FernPage> {
       error = e;
     }
 
-    if (!mounted) return;
+    if (!mounted || generationId != _generationId) return;
     // The reply has arrived (or the request failed): spin the stop icon back.
     setState(() => _generating = false);
 
@@ -293,10 +296,14 @@ class _FernPageState extends State<FernPage> {
     if (!_generating) return;
     _abortRequested = true;
     _repository.cancelActiveRequest();
-    // Give immediate visual feedback: rotate the stop button back to normal.
-    // The on-device model cannot be interrupted mid-decode, but the reply is
-    // discarded once it finishes.
-    setState(() => _generating = false);
+    // Invalidate the in-flight generation so its reply is discarded, and
+    // unlock the input (mic/attach) immediately. The on-device model cannot
+    // be interrupted mid-decode, but the stale reply is dropped once it ends.
+    _generationId++;
+    setState(() {
+      _generating = false;
+      _sending = false;
+    });
   }
 
   Future<String> _mediaDir() async {

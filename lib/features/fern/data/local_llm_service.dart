@@ -55,9 +55,10 @@ class LocalLlmService {
     return File('${dir.path}/$fileName');
   }
 
-  /// Whether the roleplay (NSFW-capable) model has finished downloading.
+  /// Whether any local model (knowledge or roleplay) has finished downloading.
   Future<bool> isDownloaded() async =>
-      (await _modelFile(_roleplayModelFileName)).existsSync();
+      (await _modelFile(_roleplayModelFileName)).existsSync() ||
+      (await _modelFile(_knowledgeModelFileName)).existsSync();
 
   /// Downloads [url] into [file], reporting [onProgress] (0..1).
   Future<File> _download(
