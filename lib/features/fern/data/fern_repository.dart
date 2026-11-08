@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ai_type.dart';
 import 'local_llm_service.dart';
 
 /// A single message in a Fern (AI assistant) conversation.
@@ -95,18 +96,19 @@ class FernConversation {
     'updatedAt': updatedAt.toIso8601String(),
   };
 
-  factory FernConversation.fromJson(Map<String, dynamic> json) =>
-      FernConversation(
-        id: json['id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        messages: (json['messages'] as List? ?? const [])
-            .map((e) => FernMessage.fromJson(Map<String, dynamic>.from(e)))
-            .toList(),
-        createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now(),
-        updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
-            DateTime.now(),
-      );
+  factory FernConversation.fromJson(
+    Map<String, dynamic> json,
+  ) => FernConversation(
+    id: json['id'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    messages: (json['messages'] as List? ?? const [])
+        .map((e) => FernMessage.fromJson(Map<String, dynamic>.from(e)))
+        .toList(),
+    createdAt:
+        DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+    updatedAt:
+        DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+  );
 }
 
 /// Local-only chat store for Fern.
@@ -121,6 +123,7 @@ class FernConversation {
 class FernRepository {
   static const _conversationsKey = 'fern_conversations_v1';
   static const _legacyMessagesKey = 'fern_messages_v1';
+  static const _aiTypeKey = 'fern_ai_type_v1';
   static const _model = 'glm-5.3-flash:cloud';
   static const _chatUrl = 'https://ollama.com/api/chat';
   static const _pollinationsUrl = 'https://text.pollinations.ai/';
@@ -139,6 +142,22 @@ class FernRepository {
       'character or narrate their actions. Never repeat the user\'s own words back to them.';
 
   http.Client? _activeClient;
+
+  /// Loads the selected AI type, defaulting to [AiType.casual].
+  Future<AiType> loadAiType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_aiTypeKey);
+    return AiType.values.firstWhere(
+      (type) => type.name == raw,
+      orElse: () => AiType.casual,
+    );
+  }
+
+  /// Persists the selected AI type.
+  Future<void> saveAiType(AiType type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_aiTypeKey, type.name);
+  }
 
   /// Cancels any in-flight cloud reply request. On-device (local) generation
   /// cannot be interrupted mid-decode from Dart without freezing the UI (the
@@ -225,7 +244,8 @@ class FernRepository {
     final messages = [
       {
         'role': 'system',
-        'content': 'You generate concise chat titles. Reply with only the title.',
+        'content':
+            'You generate concise chat titles. Reply with only the title.',
       },
       {
         'role': 'user',
@@ -287,8 +307,9 @@ class FernRepository {
         ? '${userMessage.substring(0, maxUserChars)}…'
         : userMessage;
 
+    final aiType = await loadAiType();
     final messages = [
-      {'role': 'system', 'content': _systemPrompt},
+      {'role': 'system', 'content': '$_systemPrompt\n\n${aiType.directive}'},
       ...boundedHistory.reversed,
       {'role': 'user', 'content': boundedUser},
     ];
@@ -325,7 +346,9 @@ class FernRepository {
       );
 
       if (response.statusCode != 200) {
-        throw Exception('Ollama error ${response.statusCode}: ${response.body}');
+        throw Exception(
+          'Ollama error ${response.statusCode}: ${response.body}',
+        );
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -344,10 +367,7 @@ class FernRepository {
       final response = await client.post(
         Uri.parse(_pollinationsUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'messages': messages,
-          'model': 'gpt-oss-20b',
-        }),
+        body: jsonEncode({'messages': messages, 'model': 'gpt-oss-20b'}),
       );
 
       if (response.statusCode != 200) {

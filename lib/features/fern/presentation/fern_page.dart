@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
+import 'package:lumii_quest/features/fern/data/ai_type.dart';
 import 'package:lumii_quest/features/fern/data/fern_repository.dart';
 import 'package:lumii_quest/features/fern/data/local_llm_service.dart';
 import 'package:lumii_quest/features/fern/data/media_file_io.dart';
@@ -26,13 +27,11 @@ class FernPage extends StatefulWidget {
     required this.conversation,
     required this.onChanged,
     required this.onToggleSidebar,
-    required this.onNewChat,
   });
 
   final FernConversation conversation;
   final ValueChanged<FernConversation> onChanged;
   final VoidCallback onToggleSidebar;
-  final VoidCallback onNewChat;
 
   @override
   State<FernPage> createState() => _FernPageState();
@@ -56,6 +55,7 @@ class _FernPageState extends State<FernPage> {
   DateTime? _recordingStartedAt;
   final _inputAreaKey = GlobalKey();
   double _inputAreaHeight = 0;
+  AiType _aiType = AiType.casual;
 
   bool get _supportsMedia =>
       !kIsWeb &&
@@ -69,6 +69,10 @@ class _FernPageState extends State<FernPage> {
     _controller.addListener(_handleTextChanged);
     unawaited(_checkCrashLog());
     unawaited(_refreshDownloadedState());
+    unawaited(_loadAiType());
+    // When a chat is opened (or switched to), start at the latest message
+    // instead of the top of the history.
+    _scrollToBottom();
   }
 
   @override
@@ -148,6 +152,23 @@ class _FernPageState extends State<FernPage> {
   Future<void> _refreshDownloadedState() async {
     final downloaded = await LocalLlmService.instance.isDownloaded();
     if (mounted) setState(() => _isDownloaded = downloaded);
+  }
+
+  Future<void> _loadAiType() async {
+    final type = await _repository.loadAiType();
+    if (mounted) setState(() => _aiType = type);
+  }
+
+  Future<void> _openAiSettings() async {
+    final selected = await showModalBottomSheet<AiType>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _AiTypeSheet(initial: _aiType),
+    );
+    if (selected == null || !mounted || selected == _aiType) return;
+    setState(() => _aiType = selected);
+    await _repository.saveAiType(selected);
   }
 
   Future<void> _toggleLocalModel() async {
@@ -243,11 +264,7 @@ class _FernPageState extends State<FernPage> {
     setState(() {
       _messages = [
         ..._messages,
-        FernMessage(
-          role: 'assistant',
-          content: reply!,
-          sentAt: DateTime.now(),
-        ),
+        FernMessage(role: 'assistant', content: reply!, sentAt: DateTime.now()),
       ];
     });
     _scrollToBottom();
@@ -491,8 +508,7 @@ class _FernPageState extends State<FernPage> {
         "I can only read text, so I can't hear voice messages. Send me a text and I'll answer.",
       'file' =>
         "I can only read text, so I can't open files. Tell me what it says.",
-      _ =>
-        "I can only read text, so I can't see images. Tell me what it says.",
+      _ => "I can only read text, so I can't see images. Tell me what it says.",
     };
     setState(() {
       _messages = [
@@ -541,9 +557,9 @@ class _FernPageState extends State<FernPage> {
                   ),
           ),
           IconButton(
-            tooltip: 'New chat',
-            onPressed: widget.onNewChat,
-            icon: const AppIcon(AppIcons.messageCirclePlus),
+            tooltip: 'AI settings',
+            onPressed: _openAiSettings,
+            icon: const AppIcon(AppIcons.toolCase),
           ),
         ],
         surfaceTintColor: Colors.transparent,
@@ -570,10 +586,7 @@ class _FernPageState extends State<FernPage> {
               ),
               KeyedSubtree(
                 key: _inputAreaKey,
-                child: SafeArea(
-                  top: false,
-                  child: _buildInputBar(),
-                ),
+                child: SafeArea(top: false, child: _buildInputBar()),
               ),
             ],
           ),
@@ -630,9 +643,9 @@ class _FernPageState extends State<FernPage> {
             const SizedBox(height: 12),
             Text(
               'Say hi to Fern',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             const Text(
@@ -647,7 +660,7 @@ class _FernPageState extends State<FernPage> {
   }
 }
 
-class _FernMediaInputBar extends StatelessWidget {
+class _FernMediaInputBar extends StatefulWidget {
   const _FernMediaInputBar({
     required this.controller,
     required this.isSending,
@@ -669,10 +682,56 @@ class _FernMediaInputBar extends StatelessWidget {
   final Future<void> Function() onToggleRecording;
 
   @override
+  State<_FernMediaInputBar> createState() => _FernMediaInputBarState();
+}
+
+class _FernMediaInputBarState extends State<_FernMediaInputBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spinController;
+  late final Animation<double> _spin;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _spin = _spinController.drive(
+      Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: Curves.linear)),
+    );
+    _syncSpin();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FernMediaInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isGenerating != widget.isGenerating) {
+      _syncSpin();
+    }
+  }
+
+  void _syncSpin() {
+    if (widget.isGenerating) {
+      if (!_spinController.isAnimating) _spinController.repeat();
+    } else {
+      _spinController.stop();
+      _spinController.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _spinController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final surface = Theme.of(context).colorScheme.surfaceContainerHighest;
-    final hasText = controller.text.trim().isNotEmpty;
+    final hasText = widget.controller.text.trim().isNotEmpty;
+    final isGenerating = widget.isGenerating;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -686,12 +745,12 @@ class _FernMediaInputBar extends StatelessWidget {
           children: [
             Expanded(
               child: TextField(
-                controller: controller,
+                controller: widget.controller,
                 minLines: 1,
                 maxLines: 4,
-                enabled: !isSending,
+                enabled: !widget.isSending,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
+                onSubmitted: (_) => widget.onSend(),
                 decoration: const InputDecoration(
                   hintText: 'Message Fern',
                   border: InputBorder.none,
@@ -708,35 +767,46 @@ class _FernMediaInputBar extends StatelessWidget {
             if (hasText)
               _CircleIconButton(
                 tooltip: 'Send',
-                icon: isSending ? AppIcons.loaderCircle : AppIcons.sendHorizontal,
+                icon: widget.isSending
+                    ? AppIcons.loaderCircle
+                    : AppIcons.sendHorizontal,
                 backgroundColor: primary,
                 iconColor: Colors.white,
-                onPressed: isSending ? null : onSend,
+                onPressed: widget.isSending ? null : widget.onSend,
               )
             else ...[
               IconButton(
                 tooltip: 'Voice message',
-                onPressed: isSending ? null : onToggleRecording,
+                onPressed: widget.isSending ? null : widget.onToggleRecording,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(
-                  minWidth: 44,
-                  minHeight: 44,
-                ),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 icon: AppIcon(AppIcons.mic, color: primary),
               ),
-              AnimatedRotation(
-                turns: (isGenerating || showAttachMenu) ? 0.125 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: _CircleIconButton(
-                  tooltip: isGenerating ? 'Stop' : 'Attach',
-                  icon: AppIcons.circlePlus,
-                  backgroundColor: primary,
-                  iconColor: Colors.white,
-                  onPressed: isGenerating
-                      ? onCancel
-                      : (isSending ? null : onToggleAttachMenu),
+              if (isGenerating)
+                RotationTransition(
+                  turns: _spin,
+                  child: _CircleIconButton(
+                    tooltip: 'Stop',
+                    icon: AppIcons.circlePlus,
+                    backgroundColor: primary,
+                    iconColor: Colors.white,
+                    onPressed: widget.onCancel,
+                  ),
+                )
+              else
+                AnimatedRotation(
+                  turns: widget.showAttachMenu ? 0.125 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: _CircleIconButton(
+                    tooltip: 'Attach',
+                    icon: AppIcons.circlePlus,
+                    backgroundColor: primary,
+                    iconColor: Colors.white,
+                    onPressed: widget.isSending
+                        ? null
+                        : widget.onToggleAttachMenu,
+                  ),
                 ),
-              ),
             ],
           ],
         ),
@@ -1247,4 +1317,134 @@ String _audioExtension(String path) {
 
 double _normalizeAmplitude(double db) {
   return ((db + 60) / 60).clamp(0.06, 1.0);
+}
+
+class _AiTypeSheet extends StatefulWidget {
+  const _AiTypeSheet({required this.initial});
+
+  final AiType initial;
+
+  @override
+  State<_AiTypeSheet> createState() => _AiTypeSheetState();
+}
+
+class _AiTypeSheetState extends State<_AiTypeSheet> {
+  late AiType _selected = widget.initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'AI settings',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'Choose how Fern responds.',
+                style: TextStyle(color: Color(0xFF8E8E93)),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Type',
+                style: TextStyle(
+                  color: Color(0xFF8E8E93),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final type in AiType.values)
+                    _TypeTag(
+                      type: type,
+                      selected: type == _selected,
+                      onTap: () => setState(() => _selected = type),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _selected.description,
+                style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(_selected),
+                  style: FilledButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    minimumSize: const Size(0, 48),
+                  ),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeTag extends StatelessWidget {
+  const _TypeTag({
+    required this.type,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AiType type;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = selected ? Colors.black : const Color(0xFFF2F2F2);
+    final foreground = selected ? Colors.white : const Color(0xFF1A1A1A);
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon(type.icon, color: foreground, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                type.label,
+                style: TextStyle(
+                  color: foreground,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

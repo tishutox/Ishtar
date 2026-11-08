@@ -25,17 +25,9 @@ class _FernDashboardState extends State<FernDashboard> {
   final _repository = FernRepository();
   final _searchController = TextEditingController();
   List<FernConversation> _conversations = [];
-  String? _activeId;
+  FernConversation? _active;
   bool _sidebarOpen = false;
   bool _loaded = false;
-
-  FernConversation? get _active {
-    if (_activeId == null) return null;
-    for (final c in _conversations) {
-      if (c.id == _activeId) return c;
-    }
-    return null;
-  }
 
   List<FernConversation> get _filteredConversations {
     final query = _searchController.text.trim().toLowerCase();
@@ -76,15 +68,12 @@ class _FernDashboardState extends State<FernDashboard> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
               group,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF8E8E93),
-              ),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF8E8E93)),
             ),
           ),
         );
       }
-      final selected = conversation.id == _activeId;
+      final selected = conversation.id == _active?.id;
       items.add(
         ListTile(
           dense: true,
@@ -92,9 +81,7 @@ class _FernDashboardState extends State<FernDashboard> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          tileColor: selected
-              ? const Color(0xFFE4E4E8)
-              : Colors.transparent,
+          tileColor: selected ? const Color(0xFFE4E4E8) : Colors.transparent,
           title: Text(
             conversation.title.isEmpty ? 'New chat' : conversation.title,
             maxLines: 1,
@@ -136,15 +123,14 @@ class _FernDashboardState extends State<FernDashboard> {
   }
 
   Future<void> _load() async {
-    var conversations = await _repository.loadConversations();
-    if (conversations.isEmpty) {
-      conversations = [_repository.createConversation()];
-    }
+    final conversations = await _repository.loadConversations();
     if (!mounted) return;
     setState(() {
       _conversations = conversations;
       _loaded = true;
-      _activeId = conversations.first.id;
+      // Always start in a fresh, unsaved chat. It becomes a saved conversation
+      // (and shows up in the sidebar) only once the user sends a message.
+      _active = _repository.createConversation();
     });
   }
 
@@ -154,6 +140,9 @@ class _FernDashboardState extends State<FernDashboard> {
 
   void _onConversationChanged(FernConversation updated) {
     setState(() {
+      if (_active?.id == updated.id) {
+        _active = updated;
+      }
       final index = _conversations.indexWhere((c) => c.id == updated.id);
       if (index == -1) {
         _conversations.insert(0, updated);
@@ -167,24 +156,14 @@ class _FernDashboardState extends State<FernDashboard> {
 
   void _openConversation(String id) {
     setState(() {
-      _activeId = id;
+      for (final conversation in _conversations) {
+        if (conversation.id == id) {
+          _active = conversation;
+          break;
+        }
+      }
       _sidebarOpen = false;
     });
-  }
-
-  void _newChat() {
-    final active = _active;
-    if (active != null && active.isEmpty) {
-      setState(() => _sidebarOpen = false);
-      return;
-    }
-    final conversation = _repository.createConversation();
-    setState(() {
-      _conversations.insert(0, conversation);
-      _activeId = conversation.id;
-      _sidebarOpen = false;
-    });
-    unawaited(_repository.saveConversations(_conversations));
   }
 
   void _toggleSidebar() {
@@ -194,9 +173,7 @@ class _FernDashboardState extends State<FernDashboard> {
   @override
   Widget build(BuildContext context) {
     if (!_loaded) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final active = _active;
@@ -213,7 +190,6 @@ class _FernDashboardState extends State<FernDashboard> {
                   conversation: active,
                   onChanged: _onConversationChanged,
                   onToggleSidebar: _toggleSidebar,
-                  onNewChat: _newChat,
                 ),
           Positioned.fill(
             child: IgnorePointer(
@@ -224,9 +200,7 @@ class _FernDashboardState extends State<FernDashboard> {
                 curve: Curves.easeInOut,
                 child: GestureDetector(
                   onTap: _toggleSidebar,
-                  child: ColoredBox(
-                    color: Colors.black.withValues(alpha: 0.3),
-                  ),
+                  child: ColoredBox(color: Colors.black.withValues(alpha: 0.3)),
                 ),
               ),
             ),
@@ -271,7 +245,7 @@ class _FernDashboardState extends State<FernDashboard> {
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Search chat content...',
-                      prefixIcon: const AppIcon(AppIcons.search, size: 16),
+                      prefixIcon: const AppIcon(AppIcons.search, size: 14),
                       prefixIconConstraints: const BoxConstraints(
                         minWidth: 40,
                         minHeight: 32,
@@ -308,7 +282,10 @@ class _FernDashboardState extends State<FernDashboard> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  _buildAvatar(),
+                  const SizedBox(width: 12),
                   FilledButton(
                     onPressed: () => context.push('/settings'),
                     style: FilledButton.styleFrom(
@@ -321,8 +298,6 @@ class _FernDashboardState extends State<FernDashboard> {
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
-                  const Spacer(),
-                  _buildAvatar(),
                 ],
               ),
             ),
