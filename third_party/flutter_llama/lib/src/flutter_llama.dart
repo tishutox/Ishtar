@@ -393,7 +393,24 @@ class FlutterLlama {
       }
     }
   }
-  
+
+  /// Clear the model's KV cache so the next generation starts from a fresh
+  /// context (no memory of previous generations).
+  Future<void> clearContext() async {
+    try {
+      if (_viaBackend) {
+        // Desktop FFI: the core does not expose a KV-cache clear yet; its
+        // context is only reset by unload/reload.
+      } else {
+        await _channel.invokeMethod<void>('clearContext');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('[FlutterLlama] Error clearing context: $e');
+      }
+    }
+  }
+
   /// Load model with automatic download from HuggingFace or Ollama
   /// 
   /// This method will:

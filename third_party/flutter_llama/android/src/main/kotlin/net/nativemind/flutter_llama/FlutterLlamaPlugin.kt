@@ -79,6 +79,7 @@ class FlutterLlamaPlugin : FlutterPlugin, MethodCallHandler, EventChannel.Stream
             "unloadModel" -> unloadModel(result)
             "getModelInfo" -> getModelInfo(result)
             "stopGeneration" -> stopGeneration(result)
+            "clearContext" -> clearContext(result)
             else -> result.notImplemented()
         }
     }
@@ -335,6 +336,13 @@ class FlutterLlamaPlugin : FlutterPlugin, MethodCallHandler, EventChannel.Stream
         result.success(null)
     }
 
+    // MARK: - Clear Context
+
+    private fun clearContext(result: Result) {
+        nativeClearContext()
+        result.success(null)
+    }
+
     // MARK: - Native Methods (JNI)
 
     private external fun nativeBackendInfo(): String
@@ -378,6 +386,8 @@ class FlutterLlamaPlugin : FlutterPlugin, MethodCallHandler, EventChannel.Stream
     private external fun nativeFreeModel()
 
     private external fun nativeStopGeneration()
+
+    private external fun nativeClearContext()
 
     // Data classes for JNI results
     data class GenerationResult(

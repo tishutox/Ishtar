@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
+import 'package:lumii_quest/features/account/data/account_repository.dart';
 import 'package:lumii_quest/features/fern/data/fern_repository.dart';
+import 'package:lumii_quest/features/fern/data/local_llm_service.dart';
 import 'package:lumii_quest/features/fern/presentation/fern_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -71,7 +73,7 @@ class _FernDashboardState extends State<FernDashboard> {
         currentGroup = group;
         items.add(
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
               group,
               style: const TextStyle(
@@ -85,6 +87,8 @@ class _FernDashboardState extends State<FernDashboard> {
       final selected = conversation.id == _activeId;
       items.add(
         ListTile(
+          dense: true,
+          visualDensity: const VisualDensity(vertical: -3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -112,6 +116,12 @@ class _FernDashboardState extends State<FernDashboard> {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     unawaited(_load());
+    unawaited(_syncKeepMemories());
+  }
+
+  Future<void> _syncKeepMemories() async {
+    LocalLlmService.instance.keepMemories = await AccountRepository()
+        .getKeepMemories();
   }
 
   @override
@@ -252,27 +262,32 @@ class _FernDashboardState extends State<FernDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search chat content...',
-                  prefixIcon: const AppIcon(AppIcons.search, size: 18),
-                  prefixIconConstraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 36,
-                  ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  filled: true,
-                  fillColor: _searchFill,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: BorderSide.none,
+            SizedBox(
+              height: 56,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search chat content...',
+                      prefixIcon: const AppIcon(AppIcons.search, size: 16),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 32,
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      filled: true,
+                      fillColor: _searchFill,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -291,7 +306,7 @@ class _FernDashboardState extends State<FernDashboard> {
                     ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 12, 12),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Row(
                 children: [
                   FilledButton(

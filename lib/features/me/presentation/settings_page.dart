@@ -97,9 +97,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: AppIcons.circleUserRound,
                   onTap: () => context.push('/account'),
                 ),
-                const _SettingsLinkTile(
-                  label: 'Data Privacy & Security',
+                _SettingsLinkTile(
+                  label: 'Data Privacy & Safety',
                   icon: AppIcons.fingerprintPattern,
+                  onTap: () => context.push('/privacy'),
                 ),
               ],
             ),

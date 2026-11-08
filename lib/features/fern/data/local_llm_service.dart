@@ -33,6 +33,11 @@ class LocalLlmService {
   /// (SFW) cloud fallback. Toggled from the chat app bar.
   bool useLocal = false;
 
+  /// Whether Fern keeps its memory between chats. When turned off in Settings
+  /// ("Keep Memories" off), the model context is cleared before every local
+  /// generation so each chat starts fresh.
+  bool keepMemories = true;
+
   Future<File> modelFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_modelFileName');
@@ -110,6 +115,9 @@ class LocalLlmService {
   /// methods the Android plugin does not implement) and applies the Llama-3.2
   /// chat template manually.
   Future<String> chat(List<Map<String, String>> messages) async {
+    if (!keepMemories) {
+      await _llama.clearContext();
+    }
     final response = await _llama.generate(
       GenerationParams(
         prompt: _renderLlama32Prompt(messages),

@@ -49,4 +49,32 @@ class AccountRepository {
   Future<void> updatePassword(String newPassword) async {
     await _client.auth.updateUser(UserAttributes(password: newPassword));
   }
+
+  /// Whether the local AI keeps its memories between chats. Defaults to true
+  /// (on) when the user is signed out or the row is missing.
+  Future<bool> getKeepMemories() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return true;
+    try {
+      final row = await _client
+          .from('profiles')
+          .select('keep_memories')
+          .eq('id', user.id)
+          .maybeSingle();
+      return (row?['keep_memories'] as bool?) ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> setKeepMemories(bool value) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('Sign in to update your settings.');
+    }
+    await _client
+        .from('profiles')
+        .update({'keep_memories': value})
+        .eq('id', user.id);
+  }
 }

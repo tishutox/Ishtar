@@ -45,6 +45,8 @@ class _FernPageState extends State<FernPage> {
   final _recorder = AudioRecorder();
   late List<FernMessage> _messages;
   bool _sending = false;
+  bool _generating = false;
+  bool _abortRequested = false;
   bool _downloadingModel = false;
   bool _isDownloaded = false;
   bool _isRecording = false;
@@ -196,28 +198,32 @@ class _FernPageState extends State<FernPage> {
         FernMessage(role: 'user', content: text, sentAt: DateTime.now()),
       ];
       _sending = true;
+      _generating = true;
     });
+    _abortRequested = false;
     _scrollToBottom();
 
+    String? reply;
+    Object? error;
     try {
-      final reply = await _repository.sendMessage(history, text);
-      if (!mounted) return;
-      setState(() {
-        _messages = [
-          ..._messages,
-          FernMessage(role: 'assistant', content: reply, sentAt: DateTime.now()),
-        ];
-      });
-      if (shouldTitle) {
-        final title = await _repository.generateTitle(text);
-        if (mounted && title.isNotEmpty) {
-          _persist(title: title);
-          return;
-        }
-      }
+      reply = await _repository.sendMessage(history, text);
+    } catch (e) {
+      error = e;
+    }
+
+    if (!mounted) return;
+    // The reply has arrived (or the request failed): spin the stop icon back.
+    setState(() => _generating = false);
+
+    if (_abortRequested) {
+      // Cancelled by the user: keep their message, drop the reply.
       _persist();
-    } catch (error) {
-      if (!mounted) return;
+      setState(() => _sending = false);
+      _scrollToBottom();
+      return;
+    }
+
+    if (error != null) {
       setState(() {
         _messages = [
           ..._messages,
@@ -229,10 +235,40 @@ class _FernPageState extends State<FernPage> {
         ];
       });
       _persist();
-    } finally {
-      if (mounted) setState(() => _sending = false);
+      setState(() => _sending = false);
       _scrollToBottom();
+      return;
     }
+
+    setState(() {
+      _messages = [
+        ..._messages,
+        FernMessage(
+          role: 'assistant',
+          content: reply!,
+          sentAt: DateTime.now(),
+        ),
+      ];
+    });
+    _scrollToBottom();
+
+    if (shouldTitle) {
+      final title = await _repository.generateTitle(text);
+      if (mounted && title.isNotEmpty) {
+        _persist(title: title);
+        setState(() => _sending = false);
+        return;
+      }
+    }
+
+    _persist();
+    setState(() => _sending = false);
+  }
+
+  void _cancelGeneration() {
+    if (!_generating) return;
+    _abortRequested = true;
+    _repository.cancelActiveRequest();
   }
 
   Future<String> _mediaDir() async {
@@ -568,8 +604,10 @@ class _FernPageState extends State<FernPage> {
       return _FernMediaInputBar(
         controller: _controller,
         isSending: _sending,
+        isGenerating: _generating,
         showAttachMenu: _showAttachMenu,
         onSend: _send,
+        onCancel: _cancelGeneration,
         onToggleAttachMenu: _toggleAttachMenu,
         onToggleRecording: _toggleRecording,
       );
@@ -613,16 +651,20 @@ class _FernMediaInputBar extends StatelessWidget {
   const _FernMediaInputBar({
     required this.controller,
     required this.isSending,
+    required this.isGenerating,
     required this.showAttachMenu,
     required this.onSend,
+    required this.onCancel,
     required this.onToggleAttachMenu,
     required this.onToggleRecording,
   });
 
   final TextEditingController controller;
   final bool isSending;
+  final bool isGenerating;
   final bool showAttachMenu;
   final Future<void> Function() onSend;
+  final VoidCallback onCancel;
   final VoidCallback onToggleAttachMenu;
   final Future<void> Function() onToggleRecording;
 
@@ -683,14 +725,16 @@ class _FernMediaInputBar extends StatelessWidget {
                 icon: AppIcon(AppIcons.mic, color: primary),
               ),
               AnimatedRotation(
-                turns: showAttachMenu ? 0.125 : 0,
+                turns: (isGenerating || showAttachMenu) ? 0.125 : 0,
                 duration: const Duration(milliseconds: 200),
                 child: _CircleIconButton(
-                  tooltip: 'Attach',
+                  tooltip: isGenerating ? 'Stop' : 'Attach',
                   icon: AppIcons.circlePlus,
                   backgroundColor: primary,
                   iconColor: Colors.white,
-                  onPressed: isSending ? null : onToggleAttachMenu,
+                  onPressed: isGenerating
+                      ? onCancel
+                      : (isSending ? null : onToggleAttachMenu),
                 ),
               ),
             ],

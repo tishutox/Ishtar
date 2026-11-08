@@ -542,9 +542,27 @@ Java_net_nativemind_flutter_1llama_FlutterLlamaPlugin_nativeStopGeneration(
     jobject thiz
 ) {
     std::lock_guard<std::mutex> lock(g_mutex);
-    
+
     LOGI("Stopping generation");
     g_should_stop = true;
+}
+
+// Clear the KV cache so the next generation starts from a fresh context
+JNIEXPORT void JNICALL
+Java_net_nativemind_flutter_1llama_FlutterLlamaPlugin_nativeClearContext(
+    JNIEnv* env,
+    jobject thiz
+) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    LOGI("Clearing KV cache");
+    if (g_context) {
+        llama_memory_t mem = llama_get_memory(g_context);
+        if (mem) {
+            llama_memory_clear(mem, true);
+        }
+    }
+    g_should_stop = false;
 }
 
 } // extern "C"

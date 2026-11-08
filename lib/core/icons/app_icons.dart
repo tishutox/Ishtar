@@ -69,6 +69,7 @@ abstract final class AppIcons {
   static const phone = 'phone';
   static const play = 'play';
   static const plus = 'plus';
+  static const power = 'power';
   static const refreshCcw = 'refresh-ccw';
   static const reply = 'reply';
   static const save = 'save';

@@ -138,6 +138,17 @@ class FernRepository {
       'Always stay in your assigned character and never take over the user\'s '
       'character or narrate their actions. Never repeat the user\'s own words back to them.';
 
+  http.Client? _activeClient;
+
+  /// Cancels any in-flight cloud reply request. On-device (local) generation
+  /// cannot be interrupted mid-decode from Dart without freezing the UI (the
+  /// vendored plugin holds a mutex for the whole decode loop), so its reply is
+  /// simply discarded by the caller once it completes.
+  void cancelActiveRequest() {
+    _activeClient?.close();
+    _activeClient = null;
+  }
+
   /// Loads all conversations, migrating the legacy single-conversation store
   /// on first run.
   Future<List<FernConversation>> loadConversations() async {
@@ -297,44 +308,58 @@ class FernRepository {
   }
 
   Future<String> _sendToOllama(List<Map<String, String>> messages) async {
-    final response = await http.post(
-      Uri.parse(_chatUrl),
-      headers: {
-        'Authorization': 'Bearer $_apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'model': _model,
-        'messages': messages,
-        'stream': false,
-      }),
-    );
+    final client = http.Client();
+    _activeClient = client;
+    try {
+      final response = await client.post(
+        Uri.parse(_chatUrl),
+        headers: {
+          'Authorization': 'Bearer $_apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': messages,
+          'stream': false,
+        }),
+      );
 
-    if (response.statusCode != 200) {
-      throw Exception('Ollama error ${response.statusCode}: ${response.body}');
+      if (response.statusCode != 200) {
+        throw Exception('Ollama error ${response.statusCode}: ${response.body}');
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = data['message'] as Map<String, dynamic>;
+      return message['content'] as String? ?? '';
+    } finally {
+      if (_activeClient == client) _activeClient = null;
+      client.close();
     }
-
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final message = data['message'] as Map<String, dynamic>;
-    return message['content'] as String? ?? '';
   }
 
   Future<String> _sendToPollinations(List<Map<String, String>> messages) async {
-    final response = await http.post(
-      Uri.parse(_pollinationsUrl),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'messages': messages,
-        'model': 'gpt-oss-20b',
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception(
-        'Pollinations error ${response.statusCode}: ${response.body}',
+    final client = http.Client();
+    _activeClient = client;
+    try {
+      final response = await client.post(
+        Uri.parse(_pollinationsUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'messages': messages,
+          'model': 'gpt-oss-20b',
+        }),
       );
-    }
 
-    return response.body.trim();
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Pollinations error ${response.statusCode}: ${response.body}',
+        );
+      }
+
+      return response.body.trim();
+    } finally {
+      if (_activeClient == client) _activeClient = null;
+      client.close();
+    }
   }
 }

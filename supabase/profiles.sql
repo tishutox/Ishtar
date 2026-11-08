@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   banner_url text,
   profile_background_color text not null default '#FFFFFF',
   profile_accent_color text not null default '#5860C3',
+  keep_memories boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint profiles_username_format check (username ~ '^[A-Za-z0-9._-]{1,20}$'),
@@ -26,6 +27,9 @@ add column if not exists profile_background_color text not null default '#FFFFFF
 
 alter table public.profiles
 add column if not exists profile_accent_color text not null default '#5860C3';
+
+alter table public.profiles
+add column if not exists keep_memories boolean not null default true;
 
 create unique index if not exists profiles_username_lower_unique
 on public.profiles (lower(username));
