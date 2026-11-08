@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -140,6 +141,15 @@ class FernRepository {
       'prose, perfectly mirroring the tone and explicit nature of the user\'s input. '
       'Always stay in your assigned character and never take over the user\'s '
       'character or narrate their actions. Never repeat the user\'s own words back to them.';
+
+  /// Short, clean persona prompt for the (filtered) cloud and for SFW
+  /// on-device chats. Keeps Fern's kuudere persona and the fictional-adults
+  /// scope, but drops the long creative-writing preamble the filtered models
+  /// ignore anyway — the cloud answers ~0.5s instead of ~25s with this.
+  static const _shortSystemPrompt =
+      'You are Fern, a calm, composed and softly blunt but warm companion. '
+      'Answer in English, concisely and naturally. All characters are '
+      'fictional consenting adults.';
 
   http.Client? _activeClient;
 
@@ -311,11 +321,17 @@ class FernRepository {
         : userMessage;
 
     final aiType = await loadAiType();
+    // Only the uncensored on-device roleplay actually benefits from the long
+    // creative-writing preamble; the filtered cloud and SFW models ignore it
+    // and only answer slower for it. Use the short persona prompt there.
+    final useFullPrompt =
+        LocalLlmService.instance.useLocal && aiType.usesUncensoredModel;
     final messages = [
       {
         'role': 'system',
         'content':
-            '$_systemPrompt\n\n${aiType.directive}\n\n'
+            '${useFullPrompt ? _systemPrompt : _shortSystemPrompt}\n\n'
+            '${aiType.directive}\n\n'
             'Your knowledge is current as of 2024.',
       },
       ...boundedHistory.reversed,
@@ -342,18 +358,20 @@ class FernRepository {
     final client = http.Client();
     _activeClient = client;
     try {
-      final response = await client.post(
-        Uri.parse(_chatUrl),
-        headers: {
-          'Authorization': 'Bearer $_apiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'model': _model,
-          'messages': messages,
-          'stream': false,
-        }),
-      );
+      final response = await client
+          .post(
+            Uri.parse(_chatUrl),
+            headers: {
+              'Authorization': 'Bearer $_apiKey',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'model': _model,
+              'messages': messages,
+              'stream': false,
+            }),
+          )
+          .timeout(const Duration(seconds: 90));
 
       if (response.statusCode != 200) {
         throw Exception(
@@ -364,6 +382,10 @@ class FernRepository {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final message = data['message'] as Map<String, dynamic>;
       return message['content'] as String? ?? '';
+    } on TimeoutException {
+      throw Exception(
+        'The cloud model did not answer in time. Please try again.',
+      );
     } finally {
       if (_activeClient == client) _activeClient = null;
       client.close();
@@ -374,11 +396,13 @@ class FernRepository {
     final client = http.Client();
     _activeClient = client;
     try {
-      final response = await client.post(
-        Uri.parse(_pollinationsUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'messages': messages, 'model': 'gpt-oss-20b'}),
-      );
+      final response = await client
+          .post(
+            Uri.parse(_pollinationsUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'messages': messages, 'model': 'gpt-oss-20b'}),
+          )
+          .timeout(const Duration(seconds: 90));
 
       if (response.statusCode != 200) {
         throw Exception(
@@ -387,6 +411,10 @@ class FernRepository {
       }
 
       return response.body.trim();
+    } on TimeoutException {
+      throw Exception(
+        'The cloud model did not answer in time. Please try again.',
+      );
     } finally {
       if (_activeClient == client) _activeClient = null;
       client.close();

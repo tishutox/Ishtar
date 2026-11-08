@@ -60,6 +60,28 @@ class LocalLlmService {
       (await _modelFile(_roleplayModelFileName)).existsSync() ||
       (await _modelFile(_knowledgeModelFileName)).existsSync();
 
+  /// Deletes stale model files and leftover partial (`.part`) downloads so a
+  /// corrupt or outdated model never blocks loading.
+  Future<void> _cleanupStaleModels() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final staleNames = <String>{
+      _legacyModelFileName,
+      _oldKnowledgeModelFileName,
+      '$_legacyModelFileName.part',
+      '$_oldKnowledgeModelFileName.part',
+      '$_knowledgeModelFileName.part',
+      '$_roleplayModelFileName.part',
+    };
+    for (final name in staleNames) {
+      final file = File('${dir.path}/$name');
+      if (file.existsSync()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
+    }
+  }
+
   /// Downloads [url] into [file], reporting [onProgress] (0..1).
   Future<File> _download(
     String url,
@@ -70,20 +92,37 @@ class LocalLlmService {
 
     final request = http.Request('GET', Uri.parse(url));
     final client = http.Client();
-    final streamed = await client.send(request);
-    final total = streamed.contentLength ?? 0;
-    var received = 0;
-    final sink = part.openWrite();
     try {
-      await for (final chunk in streamed.stream) {
-        received += chunk.length;
-        sink.add(chunk);
-        if (total > 0 && onProgress != null) {
-          onProgress(received / total);
+      // Bound the connect/header phase so a stalled server never hangs the UI.
+      final streamed = await client
+          .send(request)
+          .timeout(const Duration(seconds: 60));
+      final total = streamed.contentLength ?? 0;
+      var received = 0;
+      final sink = part.openWrite();
+      try {
+        // Per-chunk idle timeout: a live download keeps flowing, a stalled one
+        // fails fast instead of spinning forever.
+        await for (final chunk
+            in streamed.stream.timeout(const Duration(seconds: 30))) {
+          received += chunk.length;
+          sink.add(chunk);
+          if (total > 0 && onProgress != null) {
+            onProgress(received / total);
+          }
         }
+      } finally {
+        await sink.close();
       }
+    } catch (_) {
+      // A failed/interrupted download must never leave a partial file behind.
+      if (part.existsSync()) {
+        try {
+          await part.delete();
+        } catch (_) {}
+      }
+      rethrow;
     } finally {
-      await sink.close();
       client.close();
     }
 
@@ -114,18 +153,9 @@ class LocalLlmService {
     final url = uncensored ? roleplayModelUrl : knowledgeModelUrl;
     final file = await _modelFile(fileName);
 
-    // Free space left over from a previously switched model.
-    if (!file.existsSync()) {
-      final dir = await getApplicationDocumentsDirectory();
-      for (final stale in [_legacyModelFileName, _oldKnowledgeModelFileName]) {
-        final staleFile = File('${dir.path}/$stale');
-        if (staleFile.existsSync()) {
-          try {
-            await staleFile.delete();
-          } catch (_) {}
-        }
-      }
-    }
+    // Fern's model "reset": remove stale models and leftover partial downloads
+    // so a corrupt or outdated file never blocks loading.
+    await _cleanupStaleModels();
 
     if (!file.existsSync()) {
       await _download(url, file, onProgress: onProgress);
