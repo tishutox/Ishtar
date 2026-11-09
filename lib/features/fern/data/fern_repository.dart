@@ -222,11 +222,16 @@ class FernRepository {
   }
 
   Future<void> saveConversations(List<FernConversation> conversations) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _conversationsKey,
-      jsonEncode(conversations.map((c) => c.toJson()).toList()),
-    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _conversationsKey,
+        jsonEncode(conversations.map((c) => c.toJson()).toList()),
+      );
+      print('[Fern] saveConversations: saved ${conversations.length} chats');
+    } catch (e) {
+      print('[Fern] saveConversations error: $e');
+    }
   }
 
   /// Creates a new, empty conversation (not persisted until saved).
@@ -286,6 +291,9 @@ class FernRepository {
         : userMessage;
 
     final aiType = await loadAiType();
+    print('[Fern] sendMessage: aiType=${aiType.name}, '
+        'useLocal=${LocalLlmService.instance.useLocal}, '
+        'apiKey=${_apiKey.isNotEmpty}');
     // Only the uncensored on-device roleplay actually benefits from the long
     // creative-writing preamble; the filtered cloud and SFW models ignore it
     // and only answer slower for it. Use the short persona prompt there.
@@ -305,12 +313,16 @@ class FernRepository {
 
     final String reply;
     if (LocalLlmService.instance.useLocal) {
+      print('[Fern] sendMessage: routing to LOCAL model');
       reply = await _sendLocal(messages, uncensored: aiType.usesUncensoredModel);
     } else if (_apiKey.isNotEmpty) {
+      print('[Fern] sendMessage: routing to OLLAMA cloud');
       reply = await _sendToOllama(messages);
     } else {
+      print('[Fern] sendMessage: routing to POLLINATIONS cloud');
       reply = await _sendToPollinations(messages);
     }
+    print('[Fern] sendMessage: got reply (${reply.length} chars)');
     if (reply.trim().isEmpty) {
       throw Exception('The model returned an empty reply. Please try again.');
     }

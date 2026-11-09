@@ -225,8 +225,14 @@ class _FernPageState extends State<FernPage> {
     String? reply;
     Object? error;
     try {
-      reply = await _repository.sendMessage(history, text);
+      print('[Fern] _send: calling sendMessage (useLocal='
+          '${LocalLlmService.instance.useLocal})');
+      reply = await _repository
+          .sendMessage(history, text)
+          .timeout(const Duration(seconds: 360));
+      print('[Fern] _send: got reply (${reply.length} chars)');
     } catch (e) {
+      print('[Fern] _send: error: $e');
       error = e;
     }
 

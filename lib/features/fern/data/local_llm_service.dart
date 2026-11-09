@@ -199,10 +199,15 @@ class LocalLlmService {
     // full bounded history (already re-sent in [messages]) never duplicates
     // itself in the context. No separate clearContext call here — that would
     // run on the Flutter main thread and could block behind a running decode.
+    print('[Fern] chat: isModelLoaded=${_llama.isModelLoaded}, '
+        'loadedUncensored=$_loadedUncensored, uncensored=$uncensored');
     if (!_llama.isModelLoaded || _loadedUncensored != uncensored) {
+      print('[Fern] chat: loading model...');
       await ensureLoaded(uncensored: uncensored);
+      print('[Fern] chat: model loaded');
     }
     try {
+      print('[Fern] chat: generating (maxTokens=256)...');
       final response = await _llama
           .generate(
             GenerationParams(
@@ -218,6 +223,7 @@ class LocalLlmService {
           )
           .timeout(const Duration(seconds: 300));
       final text = response.text.trim();
+      print('[Fern] chat: done (${text.length} chars)');
       if (text.isEmpty) {
         throw Exception(
           'The on-device model returned an empty reply. Please try again.',
@@ -225,6 +231,7 @@ class LocalLlmService {
       }
       return text;
     } on TimeoutException {
+      print('[Fern] chat: TIMEOUT');
       throw Exception(
         'The on-device model took too long to answer. Please try again.',
       );

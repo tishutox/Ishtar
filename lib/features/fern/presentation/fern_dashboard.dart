@@ -139,6 +139,8 @@ class _FernDashboardState extends State<FernDashboard> {
   }
 
   void _onConversationChanged(FernConversation updated) {
+    print('[Fern] _onConversationChanged: id=${updated.id}, '
+        'messages=${updated.messages.length}, title="${updated.title}"');
     setState(() {
       if (_active?.id == updated.id) {
         _active = updated;
@@ -151,6 +153,7 @@ class _FernDashboardState extends State<FernDashboard> {
       }
       _sortConversations();
     });
+    print('[Fern] _onConversationChanged: now ${_conversations.length} chats');
     unawaited(_repository.saveConversations(_conversations));
   }
 
