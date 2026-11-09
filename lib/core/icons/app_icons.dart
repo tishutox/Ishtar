@@ -74,8 +74,11 @@ abstract final class AppIcons {
   static const peaceSign = 'peace-sign';
   static const pencil = 'pencil';
   static const pencilRuler = 'pencil-ruler';
+  static const penLine = 'pen-line';
   static const phone = 'phone';
   static const piggyBank = 'piggy-bank';
+  static const pin = 'pin';
+  static const pinOff = 'pin-off';
   static const play = 'play';
   static const plus = 'plus';
   static const power = 'power';

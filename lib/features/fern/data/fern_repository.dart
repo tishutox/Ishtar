@@ -67,6 +67,7 @@ class FernConversation {
     required this.messages,
     required this.createdAt,
     required this.updatedAt,
+    this.pinned = false,
   });
 
   final String id;
@@ -74,6 +75,7 @@ class FernConversation {
   List<FernMessage> messages;
   final DateTime createdAt;
   DateTime updatedAt;
+  bool pinned;
 
   bool get isEmpty => messages.isEmpty;
 
@@ -81,12 +83,14 @@ class FernConversation {
     String? title,
     List<FernMessage>? messages,
     DateTime? updatedAt,
+    bool? pinned,
   }) => FernConversation(
     id: id,
     title: title ?? this.title,
     messages: messages ?? this.messages,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    pinned: pinned ?? this.pinned,
   );
 
   Map<String, dynamic> toJson() => {
@@ -95,6 +99,7 @@ class FernConversation {
     'messages': messages.map((m) => m.toJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    'pinned': pinned,
   };
 
   factory FernConversation.fromJson(
@@ -109,6 +114,7 @@ class FernConversation {
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     updatedAt:
         DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+    pinned: json['pinned'] as bool? ?? false,
   );
 }
 

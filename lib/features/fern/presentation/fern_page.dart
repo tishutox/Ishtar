@@ -576,10 +576,12 @@ class _FernPageState extends State<FernPage> {
                     ),
                   )
                 : AppIcon(
-                    _modelDownloaded
+                    useLocal
                         ? AppIcons.sprout
-                        : AppIcons.arrowBigDownDash,
-                    color: _modelDownloaded ? fernGreen : null,
+                        : (_modelDownloaded
+                              ? AppIcons.cloud
+                              : AppIcons.arrowBigDownDash),
+                    color: useLocal ? fernGreen : Colors.black,
                   ),
           ),
           IconButton(
