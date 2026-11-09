@@ -268,16 +268,17 @@ class _FernPageState extends State<FernPage> {
     });
     _scrollToBottom();
 
+    // Persist the reply immediately so it is never lost, even if title
+    // generation (a second LLM call) is slow or fails.
+    _persist();
+
     if (shouldTitle) {
       final title = await _repository.generateTitle(text);
       if (mounted && title.isNotEmpty) {
         _persist(title: title);
-        setState(() => _sending = false);
-        return;
       }
     }
 
-    _persist();
     setState(() => _sending = false);
   }
 

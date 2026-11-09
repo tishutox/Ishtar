@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_llama/flutter_llama.dart';
@@ -45,9 +46,10 @@ class LocalLlmService {
   /// fallback. Toggled from the chat app bar.
   bool useLocal = false;
 
-  /// Whether Fern keeps its memory between chats. When turned off in Settings
-  /// ("Keep Memories" off), the model context is cleared before every local
-  /// generation so each chat starts fresh.
+  /// Kept for the Settings "Keep Memories" toggle. The native KV cache is now
+  /// always cleared before a local generation (see [chat]) because the full
+  /// bounded history is re-sent in the prompt each turn — persisting the cache
+  /// would duplicate that history and overflow the context, aborting llama.cpp.
   bool keepMemories = true;
 
   Future<File> _modelFile(String fileName) async {
@@ -193,25 +195,36 @@ class LocalLlmService {
     List<Map<String, String>> messages, {
     required bool uncensored,
   }) async {
-    if (!keepMemories) {
-      await _llama.clearContext();
-    }
+    // Always start from an empty KV cache. The full bounded history is already
+    // re-sent in [messages] every turn, so keeping the previous cache would
+    // duplicate that history and grow the context past contextSize (4096) —
+    // which makes llama.cpp abort (ggml_abort) and leaves the reply hanging.
+    await _llama.clearContext();
+
     if (!_llama.isModelLoaded || _loadedUncensored != uncensored) {
       await ensureLoaded(uncensored: uncensored);
     }
-    final response = await _llama.generate(
-      GenerationParams(
-        prompt: uncensored
-            ? _renderLlama32Prompt(messages)
-            : _renderQwenPrompt(messages),
-        temperature: 0.8,
-        topP: 0.95,
-        topK: 40,
-        maxTokens: 448,
-        repeatPenalty: 1.1,
-      ),
-    );
-    return response.text.trim();
+    try {
+      final response = await _llama
+          .generate(
+            GenerationParams(
+              prompt: uncensored
+                  ? _renderLlama32Prompt(messages)
+                  : _renderQwenPrompt(messages),
+              temperature: 0.8,
+              topP: 0.95,
+              topK: 40,
+              maxTokens: 448,
+              repeatPenalty: 1.1,
+            ),
+          )
+          .timeout(const Duration(seconds: 180));
+      return response.text.trim();
+    } on TimeoutException {
+      throw Exception(
+        'The on-device model took too long to answer. Please try again.',
+      );
+    }
   }
 
   /// Chat template for the Llama-based roleplay model (Hermes-3).
