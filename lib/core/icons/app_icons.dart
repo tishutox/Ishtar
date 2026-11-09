@@ -89,6 +89,7 @@ abstract final class AppIcons {
   static const sendHorizontal = 'send-horizontal';
   static const settings = 'settings';
   static const shieldKeyhole = 'shield-keyhole';
+  static const sprout = 'sprout';
   static const sticker = 'sticker';
   static const toolCase = 'tool-case';
   static const trash = 'trash';

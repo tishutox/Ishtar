@@ -14,7 +14,7 @@ import 'package:lumii_quest/features/fern/data/media_file_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-const Color fernLilac = Color(0xFF8B5CF6);
+const Color fernGreen = Color(0xFF34C759);
 
 /// Local-only chat with Fern, the built-in AI assistant.
 ///
@@ -47,6 +47,7 @@ class _FernPageState extends State<FernPage> {
   bool _abortRequested = false;
   int _generationId = 0;
   bool _downloadingModel = false;
+  bool _modelDownloaded = false;
   bool _isRecording = false;
   bool _showAttachMenu = false;
   final List<double> _amplitudes = [];
@@ -68,6 +69,7 @@ class _FernPageState extends State<FernPage> {
     _controller.addListener(_handleTextChanged);
     unawaited(_checkCrashLog());
     unawaited(_loadAiType());
+    unawaited(_loadModelDownloaded());
     // When a chat is opened (or switched to), start at the latest message
     // instead of the top of the history.
     _scrollToBottom();
@@ -158,6 +160,11 @@ class _FernPageState extends State<FernPage> {
     if (mounted) setState(() => _aiType = type);
   }
 
+  Future<void> _loadModelDownloaded() async {
+    final downloaded = await LocalLlmService.instance.isDownloaded();
+    if (mounted) setState(() => _modelDownloaded = downloaded);
+  }
+
   Future<void> _openAiSettings() async {
     final selected = await showModalBottomSheet<AiType>(
       context: context,
@@ -183,8 +190,14 @@ class _FernPageState extends State<FernPage> {
     try {
       final ok = await service.ensureLoaded();
       if (mounted) {
-        if (ok) setState(() => service.useLocal = true);
-        if (!ok) _showSnack('Could not load the local model.');
+        if (ok) {
+          setState(() {
+            service.useLocal = true;
+            _modelDownloaded = true;
+          });
+        } else {
+          _showSnack('Could not load the local model.');
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -550,7 +563,7 @@ class _FernPageState extends State<FernPage> {
             onPressed: _toggleLocalModel,
             style: useLocal
                 ? IconButton.styleFrom(
-                    backgroundColor: fernLilac.withValues(alpha: 0.18),
+                    backgroundColor: fernGreen.withValues(alpha: 0.18),
                   )
                 : null,
             icon: _downloadingModel
@@ -559,12 +572,14 @@ class _FernPageState extends State<FernPage> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: fernLilac,
+                      color: fernGreen,
                     ),
                   )
                 : AppIcon(
-                    useLocal ? AppIcons.shieldKeyhole : AppIcons.cloud,
-                    color: useLocal ? fernLilac : null,
+                    _modelDownloaded
+                        ? AppIcons.sprout
+                        : AppIcons.arrowBigDownDash,
+                    color: _modelDownloaded ? fernGreen : null,
                   ),
           ),
           IconButton(
@@ -650,19 +665,13 @@ class _FernPageState extends State<FernPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const AppIcon(AppIcons.bot, size: 42, color: fernLilac),
+            const AppIcon(AppIcons.bot, size: 42, color: Colors.black),
             const SizedBox(height: 12),
             Text(
-              'Say hi to Fern',
+              'Say hoi to Fern :3',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Fern is a local AI assistant. Your conversation stays on this '
-              'device and is gone when you log out or uninstall the app.',
-              textAlign: TextAlign.center,
             ),
           ],
         ),

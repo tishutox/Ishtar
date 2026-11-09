@@ -74,9 +74,10 @@ class _PrivacyPageState extends State<PrivacyPage> {
           ContentLayout.widthBox(
             child: const SettingsSection(
               title: 'Safety',
+              dividerIndent: 16,
               children: [
-                _PrivacyLinkTile(icon: AppIcons.userX, label: 'Blocked Users'),
-                _PrivacyLinkTile(icon: AppIcons.lifeBuoy, label: 'Support'),
+                _PrivacyLinkTile(label: 'Blocked Users'),
+                _PrivacyLinkTile(label: 'Support'),
               ],
             ),
           ),
@@ -84,8 +85,9 @@ class _PrivacyPageState extends State<PrivacyPage> {
           ContentLayout.widthBox(
             child: const SettingsSection(
               title: 'Data Privacy',
+              dividerIndent: 16,
               children: [
-                _PrivacyLinkTile(icon: AppIcons.lock, label: 'Privacy Policy'),
+                _PrivacyLinkTile(label: 'Privacy Policy'),
               ],
             ),
           ),
@@ -93,12 +95,10 @@ class _PrivacyPageState extends State<PrivacyPage> {
           ContentLayout.widthBox(
             child: SettingsSection(
               title: 'Artificial Intelligence',
+              dividerIndent: 16,
               children: [
                 ListTile(
-                  leading: AppIcon(
-                    AppIcons.bot,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
                   title: const Text('Keep Memories'),
                   trailing: _PowerToggle(
                     isOn: _keepMemories,
@@ -115,16 +115,14 @@ class _PrivacyPageState extends State<PrivacyPage> {
 }
 
 class _PrivacyLinkTile extends StatelessWidget {
-  const _PrivacyLinkTile({required this.icon, required this.label});
+  const _PrivacyLinkTile({required this.label});
 
-  final String icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return ListTile(
-      leading: AppIcon(icon, color: primary),
       title: Text(label),
       trailing: AppIcon(AppIcons.chevronRight, color: primary),
     );
