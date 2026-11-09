@@ -241,54 +241,19 @@ class FernRepository {
     );
   }
 
-  /// Generates a short, neutral title for a conversation from its first
-  /// user message. Returns an empty string when generation fails.
-  Future<String> generateTitle(String seed) async {
-    final trimmed = seed.trim().replaceAll(RegExp(r'\s+'), ' ');
-    if (trimmed.isEmpty) return '';
-    // Bound the seed so the title prompt stays tiny and cannot exceed the
-    // local model's batch window (an oversized batch aborts llama.cpp).
-    final bounded = trimmed.length > 300
-        ? '${trimmed.substring(0, 300)}…'
-        : trimmed;
-    final messages = [
-      {
-        'role': 'system',
-        'content':
-            'You generate concise chat titles. Reply with only the title.',
-      },
-      {
-        'role': 'user',
-        'content':
-            'Give a very short title (2-5 words, no quotes, no trailing punctuation) '
-            'for a conversation that starts with: "$bounded"',
-      },
-    ];
-    try {
-      final String title;
-      if (LocalLlmService.instance.useLocal) {
-        final aiType = await loadAiType();
-        title = await _sendLocal(
-          messages,
-          uncensored: aiType.usesUncensoredModel,
-        );
-      } else if (_apiKey.isNotEmpty) {
-        title = await _sendToOllama(messages);
-      } else {
-        title = await _sendToPollinations(messages);
-      }
-      return _cleanTitle(title);
-    } catch (_) {
-      return '';
-    }
-  }
-
-  String _cleanTitle(String raw) {
-    var title = raw.replaceAll('\n', ' ').replaceAll('"', '').trim();
-    if (title.length > 60) {
-      title = '${title.substring(0, 60).trim()}…';
-    }
-    return title;
+  /// Derives a short chat title from the first few words of the user's opening
+  /// message. Deterministic and instant — no model/network call that could
+  /// hang or stall the reply.
+  String titleFromMessage(String message) {
+    final words = message
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .take(5)
+        .toList();
+    if (words.isEmpty) return '';
+    final title = words.join(' ');
+    return title.length > 60 ? '${title.substring(0, 60).trim()}…' : title;
   }
 
   /// Sends [userMessage] to the assistant and returns the reply.

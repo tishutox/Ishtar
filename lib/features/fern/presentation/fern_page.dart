@@ -267,18 +267,14 @@ class _FernPageState extends State<FernPage> {
     });
     _scrollToBottom();
 
-    // Persist the reply immediately so it is never lost, then release the send
-    // lock right away. Title generation (a second LLM call) runs in the
-    // background and must not keep the input bar in a loading state.
-    _persist();
+    // Persist the reply immediately, deriving a deterministic title from the
+    // first few words of the user's message — no second LLM/network call that
+    // could hang and leave the chat unsaved.
+    final derivedTitle = shouldTitle
+        ? _repository.titleFromMessage(text)
+        : '';
+    _persist(title: derivedTitle.isEmpty ? null : derivedTitle);
     setState(() => _sending = false);
-
-    if (shouldTitle) {
-      final title = await _repository.generateTitle(text);
-      if (mounted && title.isNotEmpty) {
-        _persist(title: title);
-      }
-    }
   }
 
   void _cancelGeneration() {
