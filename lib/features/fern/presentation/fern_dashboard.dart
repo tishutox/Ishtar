@@ -141,18 +141,22 @@ class _FernDashboardState extends State<FernDashboard> {
   void _onConversationChanged(FernConversation updated) {
     print('[Fern] _onConversationChanged: id=${updated.id}, '
         'messages=${updated.messages.length}, title="${updated.title}"');
-    setState(() {
-      if (_active?.id == updated.id) {
-        _active = updated;
-      }
-      final index = _conversations.indexWhere((c) => c.id == updated.id);
-      if (index == -1) {
-        _conversations.insert(0, updated);
-      } else {
-        _conversations[index] = updated;
-      }
-      _sortConversations();
-    });
+    try {
+      setState(() {
+        if (_active?.id == updated.id) {
+          _active = updated;
+        }
+        final index = _conversations.indexWhere((c) => c.id == updated.id);
+        if (index == -1) {
+          _conversations.insert(0, updated);
+        } else {
+          _conversations[index] = updated;
+        }
+        _sortConversations();
+      });
+    } catch (e) {
+      print('[Fern] _onConversationChanged setState error: $e');
+    }
     print('[Fern] _onConversationChanged: now ${_conversations.length} chats');
     unawaited(_repository.saveConversations(_conversations));
   }

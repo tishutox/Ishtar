@@ -108,13 +108,19 @@ class _FernPageState extends State<FernPage> {
   }
 
   void _persist({String? title}) {
-    widget.onChanged(
-      widget.conversation.copyWith(
-        title: title,
-        messages: List.of(_messages),
-        updatedAt: DateTime.now(),
-      ),
-    );
+    try {
+      widget.onChanged(
+        widget.conversation.copyWith(
+          title: title,
+          messages: List.of(_messages),
+          updatedAt: DateTime.now(),
+        ),
+      );
+    } catch (e) {
+      // Persistence must never break the send flow (which would leave the
+      // input stuck in a loading state with no reply and no error).
+      print('[Fern] _persist error: $e');
+    }
   }
 
   Future<void> _checkCrashLog() async {
@@ -175,9 +181,7 @@ class _FernPageState extends State<FernPage> {
     if (_downloadingModel) return;
     setState(() => _downloadingModel = true);
     try {
-      final ok = await service.ensureLoaded(
-        uncensored: _aiType.usesUncensoredModel,
-      );
+      final ok = await service.ensureLoaded();
       if (mounted) {
         if (ok) setState(() => service.useLocal = true);
         if (!ok) _showSnack('Could not load the local model.');

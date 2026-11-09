@@ -7,29 +7,22 @@ import 'package:path_provider/path_provider.dart';
 
 /// On-device LLM inference for Fern (llama.cpp via flutter_llama).
 ///
-/// Runs one of two GGUF models, selected per AI type:
-/// * the **knowledge** model (Qwen2.5-7B-Instruct) for broad, more recent
-///   knowledge — used for every type except roleplay/lover-erotic;
-/// * the **roleplay** model (Hermes-3), an uncensored model kept so NSFW
-///   roleplay still works.
+/// Runs a single uncensored GGUF model (Hermes-3) for every AI type — the
+/// earlier two-model split (Qwen knowledge + Hermes roleplay) was removed.
 class LocalLlmService {
   LocalLlmService._();
   static final LocalLlmService instance = LocalLlmService._();
 
-  /// Broad knowledge model (Qwen2.5-3B-Instruct, Q4_K_M, ~1.9 GB). Much faster
-  /// than 7B on CPU while keeping a ~2024 knowledge cutoff.
-  static const String knowledgeModelUrl =
-      'https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf';
-  static const String _knowledgeModelFileName = 'fern_knowledge_v2.gguf';
-  static const String _oldKnowledgeModelFileName = 'fern_knowledge_v1.gguf';
-
-  /// Uncensored roleplay model (Hermes-3, 3B) kept for NSFW roleplay. Reuses
+  /// Uncensored roleplay model (Hermes-3, 3B) used for all local chats. Reuses
   /// the existing file name so users who already downloaded it keep it.
-  static const String roleplayModelUrl =
+  static const String modelUrl =
       'https://huggingface.co/bartowski/Hermes-3-Llama-3.2-3B-GGUF/resolve/main/Hermes-3-Llama-3.2-3B-Q4_K_M.gguf';
-  static const String _roleplayModelFileName = 'fern_model_v2.gguf';
+  static const String _modelFileName = 'fern_model_v2.gguf';
 
+  // Stale files from the earlier two-model setup, removed on load.
   static const String _legacyModelFileName = 'fern_model.gguf';
+  static const String _oldKnowledgeModelFileName = 'fern_knowledge_v1.gguf';
+  static const String _knowledgeModelFileName = 'fern_knowledge_v2.gguf';
 
   FlutterLlama get _llama => FlutterLlama.instance;
 
@@ -38,9 +31,6 @@ class LocalLlmService {
 
   /// Whether a model is currently loaded into memory.
   bool get isModelLoaded => _llama.isModelLoaded;
-
-  /// Which model is currently loaded: true = roleplay, false = knowledge.
-  bool? _loadedUncensored;
 
   /// Whether Fern currently uses an on-device model instead of the (SFW) cloud
   /// fallback. Toggled from the chat app bar.
@@ -57,10 +47,9 @@ class LocalLlmService {
     return File('${dir.path}/$fileName');
   }
 
-  /// Whether a local model (knowledge or roleplay) has finished downloading.
+  /// Whether the local (Hermes) model has finished downloading.
   Future<bool> isDownloaded() async =>
-      (await _modelFile(_roleplayModelFileName)).existsSync() ||
-      (await _modelFile(_knowledgeModelFileName)).existsSync();
+      (await _modelFile(_modelFileName)).existsSync();
 
   /// Deletes stale model files and leftover partial (`.part`) downloads so a
   /// corrupt or outdated model never blocks loading.
@@ -69,10 +58,11 @@ class LocalLlmService {
     final staleNames = <String>{
       _legacyModelFileName,
       _oldKnowledgeModelFileName,
+      _knowledgeModelFileName,
       '$_legacyModelFileName.part',
       '$_oldKnowledgeModelFileName.part',
       '$_knowledgeModelFileName.part',
-      '$_roleplayModelFileName.part',
+      '$_modelFileName.part',
     };
     for (final name in staleNames) {
       final file = File('${dir.path}/$name');
@@ -137,38 +127,25 @@ class LocalLlmService {
     return file;
   }
 
-  /// Downloads (if needed) and loads the model for [uncensored] into memory.
-  ///
-  /// [uncensored] = true selects the roleplay (Hermes-3) model, false selects
-  /// the knowledge (Qwen2.5) model. Switching models unloads the previous one.
+  /// Downloads (if needed) and loads the single Hermes model into memory.
   Future<bool> ensureLoaded({
-    required bool uncensored,
     void Function(double progress)? onProgress,
   }) async {
-    if (_llama.isModelLoaded && _loadedUncensored == uncensored) {
+    if (_llama.isModelLoaded) {
       return true;
     }
 
-    final fileName = uncensored
-        ? _roleplayModelFileName
-        : _knowledgeModelFileName;
-    final url = uncensored ? roleplayModelUrl : knowledgeModelUrl;
-    final file = await _modelFile(fileName);
+    final file = await _modelFile(_modelFileName);
 
     // Fern's model "reset": remove stale models and leftover partial downloads
     // so a corrupt or outdated file never blocks loading.
     await _cleanupStaleModels();
 
     if (!file.existsSync()) {
-      await _download(url, file, onProgress: onProgress);
+      await _download(modelUrl, file, onProgress: onProgress);
     }
 
-    if (_llama.isModelLoaded) {
-      await _llama.unloadModel();
-      _loadedUncensored = null;
-    }
-
-    final ok = await _llama.loadModel(
+    return _llama.loadModel(
       LlamaConfig(
         modelPath: file.path,
         nThreads: 4,
@@ -180,30 +157,22 @@ class LocalLlmService {
         verbose: false,
       ),
     );
-    if (ok) {
-      _loadedUncensored = uncensored;
-    }
-    return ok;
   }
 
-  /// Runs a chat completion with the model matching [uncensored].
+  /// Runs a chat completion with the Hermes model.
   ///
   /// Uses the 1.1 `generate` path (the 1.2 chat engine needs native `core.*`
-  /// methods the Android plugin does not implement) and applies the chat
-  /// template of the selected model manually.
-  Future<String> chat(
-    List<Map<String, String>> messages, {
-    required bool uncensored,
-  }) async {
+  /// methods the Android plugin does not implement) and applies the Llama-3.2
+  /// chat template manually.
+  Future<String> chat(List<Map<String, String>> messages) async {
     // The native bridge clears the KV cache before every generation, so the
     // full bounded history (already re-sent in [messages]) never duplicates
     // itself in the context. No separate clearContext call here — that would
     // run on the Flutter main thread and could block behind a running decode.
-    print('[Fern] chat: isModelLoaded=${_llama.isModelLoaded}, '
-        'loadedUncensored=$_loadedUncensored, uncensored=$uncensored');
-    if (!_llama.isModelLoaded || _loadedUncensored != uncensored) {
+    print('[Fern] chat: isModelLoaded=${_llama.isModelLoaded}');
+    if (!_llama.isModelLoaded) {
       print('[Fern] chat: loading model...');
-      await ensureLoaded(uncensored: uncensored);
+      await ensureLoaded();
       print('[Fern] chat: model loaded');
     }
     try {
@@ -211,9 +180,7 @@ class LocalLlmService {
       final response = await _llama
           .generate(
             GenerationParams(
-              prompt: uncensored
-                  ? _renderLlama32Prompt(messages)
-                  : _renderQwenPrompt(messages),
+              prompt: _renderLlama32Prompt(messages),
               temperature: 0.8,
               topP: 0.95,
               topK: 40,
@@ -249,18 +216,6 @@ class LocalLlmService {
       );
     }
     buffer.write('<|start_header_id|>assistant<|end_header_id|>\n\n');
-    return buffer.toString();
-  }
-
-  /// Chat template for the Qwen2.5 knowledge model.
-  String _renderQwenPrompt(List<Map<String, String>> messages) {
-    final buffer = StringBuffer();
-    for (final m in messages) {
-      final role = m['role'] ?? 'user';
-      final content = m['content'] ?? '';
-      buffer.write('<|im_start|>$role\n$content<|im_end|>\n');
-    }
-    buffer.write('<|im_start|>assistant\n');
     return buffer.toString();
   }
 

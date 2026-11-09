@@ -294,11 +294,10 @@ class FernRepository {
     print('[Fern] sendMessage: aiType=${aiType.name}, '
         'useLocal=${LocalLlmService.instance.useLocal}, '
         'apiKey=${_apiKey.isNotEmpty}');
-    // Only the uncensored on-device roleplay actually benefits from the long
-    // creative-writing preamble; the filtered cloud and SFW models ignore it
-    // and only answer slower for it. Use the short persona prompt there.
-    final useFullPrompt =
-        LocalLlmService.instance.useLocal && aiType.usesUncensoredModel;
+    // The on-device model (Hermes) benefits from the long creative-writing
+    // preamble; the filtered cloud models ignore it and only answer slower for
+    // it. Use the full prompt only for the local model.
+    final useFullPrompt = LocalLlmService.instance.useLocal;
     final messages = [
       {
         'role': 'system',
@@ -314,7 +313,7 @@ class FernRepository {
     final String reply;
     if (LocalLlmService.instance.useLocal) {
       print('[Fern] sendMessage: routing to LOCAL model');
-      reply = await _sendLocal(messages, uncensored: aiType.usesUncensoredModel);
+      reply = await _sendLocal(messages);
     } else if (_apiKey.isNotEmpty) {
       print('[Fern] sendMessage: routing to OLLAMA cloud');
       reply = await _sendToOllama(messages);
@@ -329,11 +328,8 @@ class FernRepository {
     return reply;
   }
 
-  Future<String> _sendLocal(
-    List<Map<String, String>> messages, {
-    required bool uncensored,
-  }) async {
-    return LocalLlmService.instance.chat(messages, uncensored: uncensored);
+  Future<String> _sendLocal(List<Map<String, String>> messages) async {
+    return LocalLlmService.instance.chat(messages);
   }
 
   Future<String> _sendToOllama(List<Map<String, String>> messages) async {
