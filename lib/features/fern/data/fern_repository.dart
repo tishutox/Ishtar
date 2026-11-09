@@ -303,13 +303,18 @@ class FernRepository {
       {'role': 'user', 'content': boundedUser},
     ];
 
+    final String reply;
     if (LocalLlmService.instance.useLocal) {
-      return _sendLocal(messages, uncensored: aiType.usesUncensoredModel);
+      reply = await _sendLocal(messages, uncensored: aiType.usesUncensoredModel);
+    } else if (_apiKey.isNotEmpty) {
+      reply = await _sendToOllama(messages);
+    } else {
+      reply = await _sendToPollinations(messages);
     }
-    if (_apiKey.isNotEmpty) {
-      return _sendToOllama(messages);
+    if (reply.trim().isEmpty) {
+      throw Exception('The model returned an empty reply. Please try again.');
     }
-    return _sendToPollinations(messages);
+    return reply;
   }
 
   Future<String> _sendLocal(

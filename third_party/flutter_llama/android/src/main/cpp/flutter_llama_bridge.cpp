@@ -274,10 +274,10 @@ Java_net_nativemind_flutter_1llama_FlutterLlamaPlugin_nativeGenerate(
     env->ReleaseStringUTFChars(prompt, prompt_str);
     
     // Tokenize prompt
-    const int n_prompt = -llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), NULL, 0, true, true);
+    const int n_prompt = -llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), NULL, 0, false, true);
     std::vector<llama_token> prompt_tokens(n_prompt);
     
-    if (llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0) {
+    if (llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), prompt_tokens.data(), prompt_tokens.size(), false, true) < 0) {
         LOGE("Failed to tokenize prompt");
         return nullptr;
     }
@@ -394,10 +394,10 @@ Java_net_nativemind_flutter_1llama_FlutterLlamaPlugin_nativeGenerateStreamInit(
     env->ReleaseStringUTFChars(prompt, prompt_str);
     
     // Tokenize prompt
-    const int n_prompt = -llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), NULL, 0, true, true);
+    const int n_prompt = -llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), NULL, 0, false, true);
     std::vector<llama_token> prompt_tokens(n_prompt);
     
-    if (llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), prompt_tokens.data(), prompt_tokens.size(), true, true) < 0) {
+    if (llama_tokenize(g_vocab, prompt_text.c_str(), prompt_text.size(), prompt_tokens.data(), prompt_tokens.size(), false, true) < 0) {
         LOGE("Failed to tokenize prompt");
         return;
     }

@@ -217,7 +217,13 @@ class LocalLlmService {
             ),
           )
           .timeout(const Duration(seconds: 300));
-      return response.text.trim();
+      final text = response.text.trim();
+      if (text.isEmpty) {
+        throw Exception(
+          'The on-device model returned an empty reply. Please try again.',
+        );
+      }
+      return text;
     } on TimeoutException {
       throw Exception(
         'The on-device model took too long to answer. Please try again.',
