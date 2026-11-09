@@ -253,7 +253,20 @@ Java_net_nativemind_flutter_1llama_FlutterLlamaPlugin_nativeGenerate(
         LOGE("Model not loaded");
         return nullptr;
     }
-    
+
+    // Clear the KV cache before decoding. The full bounded history is already
+    // re-sent in the prompt every turn, so a persistent cache would duplicate
+    // that history and overflow the context (ggml_abort). Clearing here on the
+    // worker thread also avoids blocking the Flutter main thread (unlike a
+    // separate clearContext method-channel call).
+    {
+        llama_memory_t mem = llama_get_memory(g_context);
+        if (mem) {
+            llama_memory_clear(mem, true);
+        }
+    }
+    g_should_stop = false;
+
     const char* prompt_str = env->GetStringUTFChars(prompt, nullptr);
     LOGI("Generating with prompt: %.50s...", prompt_str);
     

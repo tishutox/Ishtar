@@ -15,7 +15,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 const Color fernLilac = Color(0xFF8B5CF6);
-const Color fernNsfwRed = Color(0xFFE53935);
 
 /// Local-only chat with Fern, the built-in AI assistant.
 ///
@@ -268,9 +267,11 @@ class _FernPageState extends State<FernPage> {
     });
     _scrollToBottom();
 
-    // Persist the reply immediately so it is never lost, even if title
-    // generation (a second LLM call) is slow or fails.
+    // Persist the reply immediately so it is never lost, then release the send
+    // lock right away. Title generation (a second LLM call) runs in the
+    // background and must not keep the input bar in a loading state.
     _persist();
+    setState(() => _sending = false);
 
     if (shouldTitle) {
       final title = await _repository.generateTitle(text);
@@ -278,8 +279,6 @@ class _FernPageState extends State<FernPage> {
         _persist(title: title);
       }
     }
-
-    setState(() => _sending = false);
   }
 
   void _cancelGeneration() {
@@ -545,7 +544,7 @@ class _FernPageState extends State<FernPage> {
             onPressed: _toggleLocalModel,
             style: useLocal
                 ? IconButton.styleFrom(
-                    backgroundColor: fernNsfwRed.withValues(alpha: 0.18),
+                    backgroundColor: fernLilac.withValues(alpha: 0.18),
                   )
                 : null,
             icon: _downloadingModel
@@ -554,12 +553,12 @@ class _FernPageState extends State<FernPage> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: fernNsfwRed,
+                      color: fernLilac,
                     ),
                   )
                 : AppIcon(
                     useLocal ? AppIcons.shieldKeyhole : AppIcons.cloud,
-                    color: useLocal ? fernNsfwRed : null,
+                    color: useLocal ? fernLilac : null,
                   ),
           ),
           IconButton(

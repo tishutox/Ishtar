@@ -47,9 +47,9 @@ class LocalLlmService {
   bool useLocal = false;
 
   /// Kept for the Settings "Keep Memories" toggle. The native KV cache is now
-  /// always cleared before a local generation (see [chat]) because the full
-  /// bounded history is re-sent in the prompt each turn — persisting the cache
-  /// would duplicate that history and overflow the context, aborting llama.cpp.
+  /// always cleared inside the native `generate` bridge before every local
+  /// generation — the full bounded history is re-sent in the prompt each turn,
+  /// so persisting the cache would duplicate it and overflow the context.
   bool keepMemories = true;
 
   Future<File> _modelFile(String fileName) async {
@@ -195,12 +195,10 @@ class LocalLlmService {
     List<Map<String, String>> messages, {
     required bool uncensored,
   }) async {
-    // Always start from an empty KV cache. The full bounded history is already
-    // re-sent in [messages] every turn, so keeping the previous cache would
-    // duplicate that history and grow the context past contextSize (4096) —
-    // which makes llama.cpp abort (ggml_abort) and leaves the reply hanging.
-    await _llama.clearContext();
-
+    // The native bridge clears the KV cache before every generation, so the
+    // full bounded history (already re-sent in [messages]) never duplicates
+    // itself in the context. No separate clearContext call here — that would
+    // run on the Flutter main thread and could block behind a running decode.
     if (!_llama.isModelLoaded || _loadedUncensored != uncensored) {
       await ensureLoaded(uncensored: uncensored);
     }
@@ -214,11 +212,11 @@ class LocalLlmService {
               temperature: 0.8,
               topP: 0.95,
               topK: 40,
-              maxTokens: 448,
+              maxTokens: 256,
               repeatPenalty: 1.1,
             ),
           )
-          .timeout(const Duration(seconds: 180));
+          .timeout(const Duration(seconds: 300));
       return response.text.trim();
     } on TimeoutException {
       throw Exception(
