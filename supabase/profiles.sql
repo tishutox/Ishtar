@@ -153,7 +153,7 @@ begin
     values (
       new.id,
       candidate_username,
-      coalesce(nullif(new.raw_user_meta_data ->> 'display_name', ''), 'Amatsumara member'),
+      coalesce(nullif(new.raw_user_meta_data ->> 'display_name', ''), 'Ishtar member'),
       nullif(new.raw_user_meta_data ->> 'avatar_url', '')
     )
     on conflict (id) do nothing;
@@ -162,7 +162,7 @@ begin
     values (
       new.id,
       left(candidate_username, 11) || '_' || left(new.id::text, 8),
-      coalesce(nullif(new.raw_user_meta_data ->> 'display_name', ''), 'Amatsumara member'),
+      coalesce(nullif(new.raw_user_meta_data ->> 'display_name', ''), 'Ishtar member'),
       nullif(new.raw_user_meta_data ->> 'avatar_url', '')
     )
     on conflict (id) do nothing;
@@ -194,7 +194,7 @@ select
     when username_rank = 1 then base_username
     else left(base_username, 11) || '_' || left(id::text, 8)
   end,
-  coalesce(nullif(raw_user_meta_data ->> 'display_name', ''), 'Amatsumara member'),
+  coalesce(nullif(raw_user_meta_data ->> 'display_name', ''), 'Ishtar member'),
   nullif(raw_user_meta_data ->> 'avatar_url', '')
 from existing_users
 on conflict (id) do update set

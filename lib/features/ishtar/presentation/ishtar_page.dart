@@ -7,41 +7,41 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
-import 'package:lumii_quest/features/fern/data/ai_type.dart';
-import 'package:lumii_quest/features/fern/data/fern_repository.dart';
-import 'package:lumii_quest/features/fern/data/local_llm_service.dart';
-import 'package:lumii_quest/features/fern/data/media_file_io.dart';
+import 'package:lumii_quest/features/ishtar/data/ai_type.dart';
+import 'package:lumii_quest/features/ishtar/data/ishtar_repository.dart';
+import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
+import 'package:lumii_quest/features/ishtar/data/media_file_io.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-const Color fernGreen = Color(0xFF34C759);
+const Color ishtarGreen = Color(0xFF34C759);
 
-/// Local-only chat with Fern, the built-in AI assistant.
+/// Local-only chat with Ishtar, the built-in AI assistant.
 ///
 /// Messages are stored on-device (not in the database) and replies come from
 /// the Ollama cloud API.
-class FernPage extends StatefulWidget {
-  const FernPage({
+class IshtarPage extends StatefulWidget {
+  const IshtarPage({
     super.key,
     required this.conversation,
     required this.onChanged,
     required this.onToggleSidebar,
   });
 
-  final FernConversation conversation;
-  final ValueChanged<FernConversation> onChanged;
+  final IshtarConversation conversation;
+  final ValueChanged<IshtarConversation> onChanged;
   final VoidCallback onToggleSidebar;
 
   @override
-  State<FernPage> createState() => _FernPageState();
+  State<IshtarPage> createState() => _IshtarPageState();
 }
 
-class _FernPageState extends State<FernPage> {
-  final _repository = FernRepository();
+class _IshtarPageState extends State<IshtarPage> {
+  final _repository = IshtarRepository();
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _recorder = AudioRecorder();
-  late List<FernMessage> _messages;
+  late List<IshtarMessage> _messages;
   bool _sending = false;
   bool _generating = false;
   bool _abortRequested = false;
@@ -121,7 +121,7 @@ class _FernPageState extends State<FernPage> {
     } catch (e) {
       // Persistence must never break the send flow (which would leave the
       // input stuck in a loading state with no reply and no error).
-      print('[Fern] _persist error: $e');
+      print('[Ishtar] _persist error: $e');
     }
   }
 
@@ -224,11 +224,11 @@ class _FernPageState extends State<FernPage> {
 
     final generationId = ++_generationId;
 
-    final history = List<FernMessage>.of(_messages);
+    final history = List<IshtarMessage>.of(_messages);
     setState(() {
       _messages = [
         ..._messages,
-        FernMessage(role: 'user', content: text, sentAt: DateTime.now()),
+        IshtarMessage(role: 'user', content: text, sentAt: DateTime.now()),
       ];
       _sending = true;
       _generating = true;
@@ -242,14 +242,14 @@ class _FernPageState extends State<FernPage> {
     String? reply;
     Object? error;
     try {
-      print('[Fern] _send: calling sendMessage (useLocal='
+      print('[Ishtar] _send: calling sendMessage (useLocal='
           '${LocalLlmService.instance.useLocal})');
       reply = await _repository
           .sendMessage(history, text)
           .timeout(const Duration(seconds: 360));
-      print('[Fern] _send: got reply (${reply.length} chars)');
+      print('[Ishtar] _send: got reply (${reply.length} chars)');
     } catch (e) {
-      print('[Fern] _send: error: $e');
+      print('[Ishtar] _send: error: $e');
       error = e;
     }
 
@@ -269,7 +269,7 @@ class _FernPageState extends State<FernPage> {
       setState(() {
         _messages = [
           ..._messages,
-          FernMessage(
+          IshtarMessage(
             role: 'assistant',
             content: 'Sorry, something went wrong: $error',
             sentAt: DateTime.now(),
@@ -285,7 +285,7 @@ class _FernPageState extends State<FernPage> {
     setState(() {
       _messages = [
         ..._messages,
-        FernMessage(role: 'assistant', content: reply!, sentAt: DateTime.now()),
+        IshtarMessage(role: 'assistant', content: reply!, sentAt: DateTime.now()),
       ];
     });
     _scrollToBottom();
@@ -316,7 +316,7 @@ class _FernPageState extends State<FernPage> {
 
   Future<String> _mediaDir() async {
     final docs = await getApplicationDocumentsDirectory();
-    return '${docs.path}/fern_media';
+    return '${docs.path}/ishtar_media';
   }
 
   Future<void> _sendImages() async {
@@ -347,15 +347,15 @@ class _FernPageState extends State<FernPage> {
     });
     try {
       final dir = await _mediaDir();
-      final messages = <FernMessage>[];
+      final messages = <IshtarMessage>[];
       for (final image in images) {
         final extension = _imageExtension(image.name);
         final dest =
-            '$dir/fern_${DateTime.now().microsecondsSinceEpoch}.$extension';
+            '$dir/ishtar_${DateTime.now().microsecondsSinceEpoch}.$extension';
         final bytes = await image.readAsBytes();
         await writeMediaFile(dest, bytes);
         messages.add(
-          FernMessage(
+          IshtarMessage(
             role: 'user',
             content: '',
             sentAt: DateTime.now(),
@@ -394,13 +394,13 @@ class _FernPageState extends State<FernPage> {
     try {
       final dir = await _mediaDir();
       final name = file.name.isNotEmpty ? file.name : 'document.pdf';
-      final dest = '$dir/fern_${DateTime.now().microsecondsSinceEpoch}_$name';
+      final dest = '$dir/ishtar_${DateTime.now().microsecondsSinceEpoch}_$name';
       final bytes = await readMediaFile(path);
       await writeMediaFile(dest, bytes);
       setState(() {
         _messages = [
           ..._messages,
-          FernMessage(
+          IshtarMessage(
             role: 'user',
             content: '',
             sentAt: DateTime.now(),
@@ -502,13 +502,13 @@ class _FernPageState extends State<FernPage> {
       final dir = await _mediaDir();
       final extension = _audioExtension(path);
       final dest =
-          '$dir/fern_${DateTime.now().microsecondsSinceEpoch}.$extension';
+          '$dir/ishtar_${DateTime.now().microsecondsSinceEpoch}.$extension';
       final bytes = await readMediaFile(path);
       await writeMediaFile(dest, bytes);
       setState(() {
         _messages = [
           ..._messages,
-          FernMessage(
+          IshtarMessage(
             role: 'user',
             content: '',
             sentAt: DateTime.now(),
@@ -539,7 +539,7 @@ class _FernPageState extends State<FernPage> {
     setState(() {
       _messages = [
         ..._messages,
-        FernMessage(role: 'assistant', content: reply, sentAt: DateTime.now()),
+        IshtarMessage(role: 'assistant', content: reply, sentAt: DateTime.now()),
       ];
     });
     _persist();
@@ -563,7 +563,7 @@ class _FernPageState extends State<FernPage> {
             onPressed: _toggleLocalModel,
             style: useLocal
                 ? IconButton.styleFrom(
-                    backgroundColor: fernGreen.withValues(alpha: 0.18),
+                    backgroundColor: ishtarGreen.withValues(alpha: 0.18),
                   )
                 : null,
             icon: _downloadingModel
@@ -572,7 +572,7 @@ class _FernPageState extends State<FernPage> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: fernGreen,
+                      color: ishtarGreen,
                     ),
                   )
                 : AppIcon(
@@ -581,7 +581,7 @@ class _FernPageState extends State<FernPage> {
                         : (_modelDownloaded
                               ? AppIcons.cloud
                               : AppIcons.arrowBigDownDash),
-                    color: useLocal ? fernGreen : Colors.black,
+                    color: useLocal ? ishtarGreen : Colors.black,
                   ),
           ),
           IconButton(
@@ -605,7 +605,7 @@ class _FernPageState extends State<FernPage> {
                         padding: const EdgeInsets.all(16),
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
-                          return _FernBubble(
+                          return _IshtarBubble(
                             message: _messages[index],
                             isMine: _messages[index].role == 'user',
                           );
@@ -642,7 +642,7 @@ class _FernPageState extends State<FernPage> {
           onFinish: _finishRecording,
         );
       }
-      return _FernMediaInputBar(
+      return _IshtarMediaInputBar(
         controller: _controller,
         isSending: _sending,
         isGenerating: _generating,
@@ -653,7 +653,7 @@ class _FernPageState extends State<FernPage> {
         onToggleRecording: _toggleRecording,
       );
     }
-    return _FernTextInputBar(
+    return _IshtarTextInputBar(
       controller: _controller,
       isSending: _sending,
       onSend: _send,
@@ -670,7 +670,7 @@ class _FernPageState extends State<FernPage> {
             const AppIcon(AppIcons.bot, size: 42, color: Colors.black),
             const SizedBox(height: 12),
             Text(
-              'Say hoi to Fern :3',
+              'Say hoi to Ishtar :3',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -682,8 +682,8 @@ class _FernPageState extends State<FernPage> {
   }
 }
 
-class _FernMediaInputBar extends StatelessWidget {
-  const _FernMediaInputBar({
+class _IshtarMediaInputBar extends StatelessWidget {
+  const _IshtarMediaInputBar({
     required this.controller,
     required this.isSending,
     required this.isGenerating,
@@ -727,7 +727,7 @@ class _FernMediaInputBar extends StatelessWidget {
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => onSend(),
                 decoration: const InputDecoration(
-                  hintText: 'Message Fern',
+                  hintText: 'Message Ishtar',
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
@@ -788,8 +788,8 @@ class _FernMediaInputBar extends StatelessWidget {
   }
 }
 
-class _FernTextInputBar extends StatelessWidget {
-  const _FernTextInputBar({
+class _IshtarTextInputBar extends StatelessWidget {
+  const _IshtarTextInputBar({
     required this.controller,
     required this.isSending,
     required this.onSend,
@@ -814,7 +814,7 @@ class _FernTextInputBar extends StatelessWidget {
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => onSend(),
               decoration: InputDecoration(
-                hintText: 'Message Fern',
+                hintText: 'Message Ishtar',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(18),
                 ),
@@ -1041,10 +1041,10 @@ class _RecordingWaveform extends StatelessWidget {
   }
 }
 
-class _FernBubble extends StatelessWidget {
-  const _FernBubble({required this.message, required this.isMine});
+class _IshtarBubble extends StatelessWidget {
+  const _IshtarBubble({required this.message, required this.isMine});
 
-  final FernMessage message;
+  final IshtarMessage message;
   final bool isMine;
 
   @override
@@ -1053,12 +1053,12 @@ class _FernBubble extends StatelessWidget {
       case 'image':
         return Align(
           alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-          child: _FernImageBubble(path: message.mediaPath ?? ''),
+          child: _IshtarImageBubble(path: message.mediaPath ?? ''),
         );
       case 'audio':
         return Align(
           alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-          child: _FernAudioBubble(
+          child: _IshtarAudioBubble(
             path: message.mediaPath ?? '',
             duration: message.mediaDuration ?? 0,
             isMine: isMine,
@@ -1067,26 +1067,40 @@ class _FernBubble extends StatelessWidget {
       case 'file':
         return Align(
           alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-          child: _FernFileBubble(
+          child: _IshtarFileBubble(
             fileName: message.fileName ?? 'File',
             isMine: isMine,
           ),
         );
       default:
+        if (!isMine) {
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              message.content,
+              style: const TextStyle(
+                color: Color(0xFF1A1A1A),
+                fontSize: 15,
+                height: 1.35,
+              ),
+            ),
+          );
+        }
         return Align(
-          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          alignment: Alignment.centerRight,
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             constraints: const BoxConstraints(maxWidth: 300),
             decoration: BoxDecoration(
-              color: isMine ? Colors.black : const Color(0xFFF2F2F2),
+              color: Colors.black,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               message.content,
-              style: TextStyle(
-                color: isMine ? Colors.white : const Color(0xFF1A1A1A),
+              style: const TextStyle(
+                color: Colors.white,
                 fontSize: 15,
                 height: 1.35,
               ),
@@ -1097,8 +1111,8 @@ class _FernBubble extends StatelessWidget {
   }
 }
 
-class _FernFileBubble extends StatelessWidget {
-  const _FernFileBubble({required this.fileName, required this.isMine});
+class _IshtarFileBubble extends StatelessWidget {
+  const _IshtarFileBubble({required this.fileName, required this.isMine});
 
   final String fileName;
   final bool isMine;
@@ -1134,8 +1148,8 @@ class _FernFileBubble extends StatelessWidget {
   }
 }
 
-class _FernImageBubble extends StatelessWidget {
-  const _FernImageBubble({required this.path});
+class _IshtarImageBubble extends StatelessWidget {
+  const _IshtarImageBubble({required this.path});
 
   final String path;
 
@@ -1177,8 +1191,8 @@ class _FernImageBubble extends StatelessWidget {
   }
 }
 
-class _FernAudioBubble extends StatefulWidget {
-  const _FernAudioBubble({
+class _IshtarAudioBubble extends StatefulWidget {
+  const _IshtarAudioBubble({
     required this.path,
     required this.duration,
     required this.isMine,
@@ -1189,10 +1203,10 @@ class _FernAudioBubble extends StatefulWidget {
   final bool isMine;
 
   @override
-  State<_FernAudioBubble> createState() => _FernAudioBubbleState();
+  State<_IshtarAudioBubble> createState() => _IshtarAudioBubbleState();
 }
 
-class _FernAudioBubbleState extends State<_FernAudioBubble> {
+class _IshtarAudioBubbleState extends State<_IshtarAudioBubble> {
   final _player = AudioPlayer();
   bool _isPlaying = false;
   StreamSubscription<void>? _completeSub;
@@ -1325,7 +1339,7 @@ class _AiTypeSheetState extends State<_AiTypeSheet> {
               ),
               const SizedBox(height: 2),
               const Text(
-                'Choose how Fern responds.',
+                'Choose how Ishtar responds.',
                 style: TextStyle(color: Color(0xFF8E8E93)),
               ),
               const SizedBox(height: 16),
@@ -1342,7 +1356,12 @@ class _AiTypeSheetState extends State<_AiTypeSheet> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  for (final type in AiType.values)
+                  for (final type in AiType.values.toList()
+                    ..sort(
+                      (a, b) => a.label
+                          .toLowerCase()
+                          .compareTo(b.label.toLowerCase()),
+                    ))
                     _TypeTag(
                       type: type,
                       selected: type == _selected,

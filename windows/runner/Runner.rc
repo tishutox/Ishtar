@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "Amatsumara" "\0"
-            VALUE "FileDescription", "Amatsumara" "\0"
+            VALUE "CompanyName", "Ishtar" "\0"
+            VALUE "FileDescription", "Ishtar" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "lumii_quest" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 Amatsumara. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Ishtar. All rights reserved." "\0"
             VALUE "OriginalFilename", "lumii_quest.exe" "\0"
-            VALUE "ProductName", "Amatsumara" "\0"
+            VALUE "ProductName", "Ishtar" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

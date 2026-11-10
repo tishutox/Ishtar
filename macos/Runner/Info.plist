@@ -23,9 +23,9 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Amatsumara uses your camera for video calls.</string>
+	<string>Ishtar uses your camera for video calls.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Amatsumara uses your microphone for voice and video calls.</string>
+	<string>Ishtar uses your microphone for voice and video calls.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>

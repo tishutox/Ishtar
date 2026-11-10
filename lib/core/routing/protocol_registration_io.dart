@@ -8,7 +8,7 @@ void registerAppProtocol() {
 
   const prefix = r'SOFTWARE\Classes\lumiiquest';
   final command = '"${Platform.resolvedExecutable}" "%1"';
-  _setRegistryValue(prefix, '', 'URL:Amatsumara');
+  _setRegistryValue(prefix, '', 'URL:Ishtar');
   _setRegistryValue(prefix, 'URL Protocol', '');
   _setRegistryValue('$prefix\\shell\\open\\command', '', command);
 }

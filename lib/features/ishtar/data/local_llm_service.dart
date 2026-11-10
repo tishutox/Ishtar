@@ -5,7 +5,7 @@ import 'package:flutter_llama/flutter_llama.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
-/// On-device LLM inference for Fern (llama.cpp via flutter_llama).
+/// On-device LLM inference for Ishtar (llama.cpp via flutter_llama).
 ///
 /// Runs a single uncensored GGUF model (Hermes-3) for every AI type — the
 /// earlier two-model split (Qwen knowledge + Hermes roleplay) was removed.
@@ -17,12 +17,12 @@ class LocalLlmService {
   /// the existing file name so users who already downloaded it keep it.
   static const String modelUrl =
       'https://huggingface.co/bartowski/Hermes-3-Llama-3.2-3B-GGUF/resolve/main/Hermes-3-Llama-3.2-3B-Q4_K_M.gguf';
-  static const String _modelFileName = 'fern_model_v2.gguf';
+  static const String _modelFileName = 'ishtar_model_v2.gguf';
 
   // Stale files from the earlier two-model setup, removed on load.
-  static const String _legacyModelFileName = 'fern_model.gguf';
-  static const String _oldKnowledgeModelFileName = 'fern_knowledge_v1.gguf';
-  static const String _knowledgeModelFileName = 'fern_knowledge_v2.gguf';
+  static const String _legacyModelFileName = 'ishtar_model.gguf';
+  static const String _oldKnowledgeModelFileName = 'ishtar_knowledge_v1.gguf';
+  static const String _knowledgeModelFileName = 'ishtar_knowledge_v2.gguf';
 
   FlutterLlama get _llama => FlutterLlama.instance;
 
@@ -32,7 +32,7 @@ class LocalLlmService {
   /// Whether a model is currently loaded into memory.
   bool get isModelLoaded => _llama.isModelLoaded;
 
-  /// Whether Fern currently uses an on-device model instead of the (SFW) cloud
+  /// Whether Ishtar currently uses an on-device model instead of the (SFW) cloud
   /// fallback. Toggled from the chat app bar.
   bool useLocal = false;
 
@@ -137,7 +137,7 @@ class LocalLlmService {
 
     final file = await _modelFile(_modelFileName);
 
-    // Fern's model "reset": remove stale models and leftover partial downloads
+    // Ishtar's model "reset": remove stale models and leftover partial downloads
     // so a corrupt or outdated file never blocks loading.
     await _cleanupStaleModels();
 
@@ -169,14 +169,14 @@ class LocalLlmService {
     // full bounded history (already re-sent in [messages]) never duplicates
     // itself in the context. No separate clearContext call here — that would
     // run on the Flutter main thread and could block behind a running decode.
-    print('[Fern] chat: isModelLoaded=${_llama.isModelLoaded}');
+    print('[Ishtar] chat: isModelLoaded=${_llama.isModelLoaded}');
     if (!_llama.isModelLoaded) {
-      print('[Fern] chat: loading model...');
+      print('[Ishtar] chat: loading model...');
       await ensureLoaded();
-      print('[Fern] chat: model loaded');
+      print('[Ishtar] chat: model loaded');
     }
     try {
-      print('[Fern] chat: generating (maxTokens=256)...');
+      print('[Ishtar] chat: generating (maxTokens=256)...');
       final response = await _llama
           .generate(
             GenerationParams(
@@ -190,7 +190,7 @@ class LocalLlmService {
           )
           .timeout(const Duration(seconds: 300));
       final text = response.text.trim();
-      print('[Fern] chat: done (${text.length} chars)');
+      print('[Ishtar] chat: done (${text.length} chars)');
       if (text.isEmpty) {
         throw Exception(
           'The on-device model returned an empty reply. Please try again.',
@@ -198,7 +198,7 @@ class LocalLlmService {
       }
       return text;
     } on TimeoutException {
-      print('[Fern] chat: TIMEOUT');
+      print('[Ishtar] chat: TIMEOUT');
       throw Exception(
         'The on-device model took too long to answer. Please try again.',
       );

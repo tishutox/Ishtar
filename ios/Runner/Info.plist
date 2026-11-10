@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Amatsumara</string>
+	<string>Ishtar</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Amatsumara</string>
+	<string>Ishtar</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleURLTypes</key>
@@ -36,11 +36,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Amatsumara uses your photo library when you choose a profile image.</string>
+	<string>Ishtar uses your photo library when you choose a profile image.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Amatsumara uses your camera for video calls.</string>
+	<string>Ishtar uses your camera for video calls.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Amatsumara uses your microphone for voice and video calls.</string>
+	<string>Ishtar uses your microphone for voice and video calls.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

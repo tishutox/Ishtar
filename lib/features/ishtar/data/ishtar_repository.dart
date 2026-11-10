@@ -7,9 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ai_type.dart';
 import 'local_llm_service.dart';
 
-/// A single message in a Fern (AI assistant) conversation.
-class FernMessage {
-  const FernMessage({
+/// A single message in an Ishtar (AI assistant) conversation.
+class IshtarMessage {
+  const IshtarMessage({
     required this.role,
     required this.content,
     required this.sentAt,
@@ -47,7 +47,7 @@ class FernMessage {
     'fileName': fileName,
   };
 
-  factory FernMessage.fromJson(Map<String, dynamic> json) => FernMessage(
+  factory IshtarMessage.fromJson(Map<String, dynamic> json) => IshtarMessage(
     role: json['role'] as String? ?? 'assistant',
     content: json['content'] as String? ?? '',
     sentAt:
@@ -59,9 +59,9 @@ class FernMessage {
   );
 }
 
-/// A single local Fern conversation with an AI-generated title.
-class FernConversation {
-  FernConversation({
+/// A single local Ishtar conversation with an AI-generated title.
+class IshtarConversation {
+  IshtarConversation({
     required this.id,
     required this.title,
     required this.messages,
@@ -72,19 +72,19 @@ class FernConversation {
 
   final String id;
   String title;
-  List<FernMessage> messages;
+  List<IshtarMessage> messages;
   final DateTime createdAt;
   DateTime updatedAt;
   bool pinned;
 
   bool get isEmpty => messages.isEmpty;
 
-  FernConversation copyWith({
+  IshtarConversation copyWith({
     String? title,
-    List<FernMessage>? messages,
+    List<IshtarMessage>? messages,
     DateTime? updatedAt,
     bool? pinned,
-  }) => FernConversation(
+  }) => IshtarConversation(
     id: id,
     title: title ?? this.title,
     messages: messages ?? this.messages,
@@ -102,13 +102,13 @@ class FernConversation {
     'pinned': pinned,
   };
 
-  factory FernConversation.fromJson(
+  factory IshtarConversation.fromJson(
     Map<String, dynamic> json,
-  ) => FernConversation(
+  ) => IshtarConversation(
     id: json['id'] as String? ?? '',
     title: json['title'] as String? ?? '',
     messages: (json['messages'] as List? ?? const [])
-        .map((e) => FernMessage.fromJson(Map<String, dynamic>.from(e)))
+        .map((e) => IshtarMessage.fromJson(Map<String, dynamic>.from(e)))
         .toList(),
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
@@ -118,7 +118,7 @@ class FernConversation {
   );
 }
 
-/// Local-only chat store for Fern.
+/// Local-only chat store for Ishtar.
 ///
 /// Conversations are persisted in [SharedPreferences] on the device only —
 /// never in the database — so logging out or uninstalling the app discards the
@@ -127,20 +127,20 @@ class FernConversation {
 /// Replies come from Ollama when `OLLAMA_API_KEY` is set (higher quality) and
 /// otherwise from Pollinations.ai, a free, keyless public endpoint so the
 /// chatbot works for everyone without any secret in the app.
-class FernRepository {
-  static const _conversationsKey = 'fern_conversations_v1';
-  static const _legacyMessagesKey = 'fern_messages_v1';
-  static const _aiTypeKey = 'fern_ai_type_v1';
+class IshtarRepository {
+  static const _conversationsKey = 'ishtar_conversations_v1';
+  static const _legacyMessagesKey = 'ishtar_messages_v1';
+  static const _aiTypeKey = 'ishtar_ai_type_v1';
   static const _model = 'glm-5.3-flash:cloud';
   static const _chatUrl = 'https://ollama.com/api/chat';
   static const _pollinationsUrl = 'https://text.pollinations.ai/';
   static const _apiKey = String.fromEnvironment('OLLAMA_API_KEY');
-  /// Fern's personality: a laid-back, computer-science-nerdy buddy who's fun
+  /// Ishtar's personality: a laid-back, computer-science-nerdy buddy who's fun
   /// to hang out with. Answers in English, keeps it casual, and occasionally
   /// cracks a cheeky double-entendre. All characters are fictional consenting
   /// adults.
   static const _persona =
-      'You are Fern, a laid-back, witty companion — the kind of chill dude '
+      'You are Ishtar, a laid-back, witty companion — the kind of chill dude '
       'people enjoy hanging out with. You are genuinely into computer science: '
       'you naturally drop nerdy references to code, systems, hardware and tech, '
       'but always keep them relatable and never pedantic. Your tone is casual, '
@@ -178,14 +178,14 @@ class FernRepository {
 
   /// Loads all conversations, migrating the legacy single-conversation store
   /// on first run.
-  Future<List<FernConversation>> loadConversations() async {
+  Future<List<IshtarConversation>> loadConversations() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_conversationsKey);
     if (raw != null && raw.isNotEmpty) {
       try {
         final decoded = jsonDecode(raw) as List;
         return decoded
-            .map((e) => FernConversation.fromJson(Map<String, dynamic>.from(e)))
+            .map((e) => IshtarConversation.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       } catch (_) {
         return const [];
@@ -198,10 +198,10 @@ class FernRepository {
       try {
         final decoded = jsonDecode(legacy) as List;
         final messages = decoded
-            .map((e) => FernMessage.fromJson(Map<String, dynamic>.from(e)))
+            .map((e) => IshtarMessage.fromJson(Map<String, dynamic>.from(e)))
             .toList();
         final now = DateTime.now();
-        final conversation = FernConversation(
+        final conversation = IshtarConversation(
           id: now.microsecondsSinceEpoch.toString(),
           title: '',
           messages: messages,
@@ -219,23 +219,23 @@ class FernRepository {
     return const [];
   }
 
-  Future<void> saveConversations(List<FernConversation> conversations) async {
+  Future<void> saveConversations(List<IshtarConversation> conversations) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         _conversationsKey,
         jsonEncode(conversations.map((c) => c.toJson()).toList()),
       );
-      print('[Fern] saveConversations: saved ${conversations.length} chats');
+      print('[Ishtar] saveConversations: saved ${conversations.length} chats');
     } catch (e) {
-      print('[Fern] saveConversations error: $e');
+      print('[Ishtar] saveConversations error: $e');
     }
   }
 
   /// Creates a new, empty conversation (not persisted until saved).
-  FernConversation createConversation() {
+  IshtarConversation createConversation() {
     final now = DateTime.now();
-    return FernConversation(
+    return IshtarConversation(
       id: now.microsecondsSinceEpoch.toString(),
       title: '',
       messages: const [],
@@ -261,7 +261,7 @@ class FernRepository {
 
   /// Sends [userMessage] to the assistant and returns the reply.
   Future<String> sendMessage(
-    List<FernMessage> history,
+    List<IshtarMessage> history,
     String userMessage,
   ) async {
     // Bound the prompt so llama.cpp never aborts on an oversized batch
@@ -289,7 +289,7 @@ class FernRepository {
         : userMessage;
 
     final aiType = await loadAiType();
-    print('[Fern] sendMessage: aiType=${aiType.name}, '
+    print('[Ishtar] sendMessage: aiType=${aiType.name}, '
         'useLocal=${LocalLlmService.instance.useLocal}, '
         'apiKey=${_apiKey.isNotEmpty}');
     final messages = [
@@ -306,16 +306,16 @@ class FernRepository {
 
     final String reply;
     if (LocalLlmService.instance.useLocal) {
-      print('[Fern] sendMessage: routing to LOCAL model');
+      print('[Ishtar] sendMessage: routing to LOCAL model');
       reply = await _sendLocal(messages);
     } else if (_apiKey.isNotEmpty) {
-      print('[Fern] sendMessage: routing to OLLAMA cloud');
+      print('[Ishtar] sendMessage: routing to OLLAMA cloud');
       reply = await _sendToOllama(messages);
     } else {
-      print('[Fern] sendMessage: routing to POLLINATIONS cloud');
+      print('[Ishtar] sendMessage: routing to POLLINATIONS cloud');
       reply = await _sendToPollinations(messages);
     }
-    print('[Fern] sendMessage: got reply (${reply.length} chars)');
+    print('[Ishtar] sendMessage: got reply (${reply.length} chars)');
     if (reply.trim().isEmpty) {
       throw Exception('The model returned an empty reply. Please try again.');
     }

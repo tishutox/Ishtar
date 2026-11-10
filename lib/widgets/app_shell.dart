@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:lumii_quest/features/fern/presentation/fern_dashboard.dart';
+import 'package:lumii_quest/features/ishtar/presentation/ishtar_dashboard.dart';
 import 'package:lumii_quest/features/me/presentation/me_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Root screen: shows the sign-in wizard until a user is authenticated,
-/// then the Fern AI chat.
+/// then the Ishtar AI chat.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -38,6 +38,6 @@ class _AppShellState extends State<AppShell> {
     if (Supabase.instance.client.auth.currentUser == null) {
       return const MePage();
     }
-    return const FernDashboard();
+    return const IshtarDashboard();
   }
 }

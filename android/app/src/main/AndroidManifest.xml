@@ -14,7 +14,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <application
-        android:label="Amatsumara"
+        android:label="Ishtar"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true">
@@ -45,7 +45,7 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https"
                       android:host="tishutox.github.io"
-                      android:pathPrefix="/Amatsumara/app/u/"/>
+                      android:pathPrefix="/Ishtar/app/u/"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>

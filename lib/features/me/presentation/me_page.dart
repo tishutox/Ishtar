@@ -368,7 +368,7 @@ class _MePageState extends State<MePage> {
               AppIcon(AppIcons.heart, size: 64, color: primary),
               const SizedBox(height: 16),
               Text(
-                'Amatsumara',
+                'Ishtar',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: primary,
@@ -770,7 +770,7 @@ class _SignedInProfile extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    displayName ?? 'Amatsumara member',
+                    displayName ?? 'Ishtar member',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,

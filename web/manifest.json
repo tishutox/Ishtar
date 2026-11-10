@@ -1,11 +1,11 @@
 {
-    "name": "Amatsumara",
-    "short_name": "Amatsumara",
+    "name": "Ishtar",
+    "short_name": "Ishtar",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#5860c3",
-    "description": "Amatsumara community app.",
+    "description": "Ishtar community app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

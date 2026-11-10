@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
 import 'package:lumii_quest/core/responsive/content_layout.dart';
 import 'package:lumii_quest/features/account/data/account_repository.dart';
-import 'package:lumii_quest/features/fern/data/local_llm_service.dart';
+import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
 import 'package:lumii_quest/widgets/settings_section.dart';
 
 const Color _onColor = Color(0xFF34C759);

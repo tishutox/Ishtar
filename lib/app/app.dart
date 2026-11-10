@@ -47,7 +47,7 @@ class _LumiiQuestAppState extends State<LumiiQuestApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Amatsumara',
+      title: 'Ishtar',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       routerConfig: appRouter,

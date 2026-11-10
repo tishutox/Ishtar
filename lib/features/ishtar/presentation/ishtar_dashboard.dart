@@ -4,34 +4,32 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
 import 'package:lumii_quest/features/account/data/account_repository.dart';
-import 'package:lumii_quest/features/fern/data/fern_repository.dart';
-import 'package:lumii_quest/features/fern/data/local_llm_service.dart';
-import 'package:lumii_quest/features/fern/presentation/fern_page.dart';
+import 'package:lumii_quest/features/ishtar/data/ishtar_repository.dart';
+import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
+import 'package:lumii_quest/features/ishtar/presentation/ishtar_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Signed-in root: a light-gray dashboard (sidebar) with the active Fern chat
+/// Signed-in root: a light-gray dashboard (sidebar) with the active Ishtar chat
 /// shifted to its right.
-class FernDashboard extends StatefulWidget {
-  const FernDashboard({super.key});
+class IshtarDashboard extends StatefulWidget {
+  const IshtarDashboard({super.key});
 
   @override
-  State<FernDashboard> createState() => _FernDashboardState();
+  State<IshtarDashboard> createState() => _IshtarDashboardState();
 }
 
-class _FernDashboardState extends State<FernDashboard> {
+class _IshtarDashboardState extends State<IshtarDashboard> {
   static const Color _sidebarColor = Color(0xFFF6F6F6);
   static const Color _dangerColor = Color(0xFFE53935);
 
-  final _repository = FernRepository();
+  final _repository = IshtarRepository();
   final _searchController = TextEditingController();
-  late final FocusNode _searchFocusNode;
-  List<FernConversation> _conversations = [];
-  FernConversation? _active;
+  List<IshtarConversation> _conversations = [];
+  IshtarConversation? _active;
   bool _sidebarOpen = false;
   bool _loaded = false;
-  bool _searchOpen = false;
 
-  List<FernConversation> get _filteredConversations {
+  List<IshtarConversation> get _filteredConversations {
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return _conversations;
     return _conversations.where((c) {
@@ -58,7 +56,7 @@ class _FernDashboardState extends State<FernDashboard> {
     return 'An eternity ago';
   }
 
-  List<Widget> _buildChatListItems(List<FernConversation> conversations) {
+  List<Widget> _buildChatListItems(List<IshtarConversation> conversations) {
     final items = <Widget>[];
     final pinned = conversations.where((c) => c.pinned).toList();
     final unpinned = conversations.where((c) => !c.pinned).toList();
@@ -104,33 +102,34 @@ class _FernDashboardState extends State<FernDashboard> {
     return items;
   }
 
-  Widget _buildChatTile(FernConversation conversation) {
+  Widget _buildChatTile(IshtarConversation conversation) {
     final selected = conversation.id == _active?.id;
-    return ListTile(
-      dense: true,
-      visualDensity: const VisualDensity(vertical: -3),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      tileColor: selected ? const Color(0xFFE4E4E8) : Colors.transparent,
-      title: Text(
-        conversation.title.isEmpty ? 'New chat' : conversation.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Color(0xFF1A1A1A),
-          fontWeight: FontWeight.w600,
+    return Builder(
+      builder: (tileContext) => ListTile(
+        dense: true,
+        visualDensity: const VisualDensity(vertical: -3),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
         ),
+        tileColor: selected ? const Color(0xFFE4E4E8) : Colors.transparent,
+        title: Text(
+          conversation.title.isEmpty ? 'New chat' : conversation.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF1A1A1A),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        onTap: () => _openConversation(conversation.id),
+        onLongPress: () => _showChatActions(tileContext, conversation),
       ),
-      onTap: () => _openConversation(conversation.id),
-      onLongPress: () => _showChatActions(conversation),
     );
   }
 
   @override
   void initState() {
     super.initState();
-    _searchFocusNode = FocusNode()..addListener(_onSearchFocusChanged);
     _searchController.addListener(_onSearchChanged);
     unawaited(_load());
     unawaited(_syncKeepMemories());
@@ -143,8 +142,6 @@ class _FernDashboardState extends State<FernDashboard> {
 
   @override
   void dispose() {
-    _searchFocusNode.removeListener(_onSearchFocusChanged);
-    _searchFocusNode.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
@@ -152,35 +149,6 @@ class _FernDashboardState extends State<FernDashboard> {
 
   void _onSearchChanged() {
     if (mounted) setState(() {});
-  }
-
-  void _onSearchFocusChanged() {
-    if (!_searchFocusNode.hasFocus) {
-      _resetSearch();
-    }
-  }
-
-  /// Collapses the search bar, clears its query and drops focus.
-  void _resetSearch() {
-    if (!_searchOpen) return;
-    _searchController.clear();
-    _searchFocusNode.unfocus();
-    setState(() => _searchOpen = false);
-  }
-
-  void _openSearch() {
-    setState(() => _searchOpen = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _searchFocusNode.requestFocus();
-    });
-  }
-
-  void _newChat() {
-    _resetSearch();
-    setState(() {
-      _active = _repository.createConversation();
-      _sidebarOpen = false;
-    });
   }
 
   Future<void> _load() async {
@@ -202,8 +170,8 @@ class _FernDashboardState extends State<FernDashboard> {
     });
   }
 
-  void _onConversationChanged(FernConversation updated) {
-    print('[Fern] _onConversationChanged: id=${updated.id}, '
+  void _onConversationChanged(IshtarConversation updated) {
+    print('[Ishtar] _onConversationChanged: id=${updated.id}, '
         'messages=${updated.messages.length}, title="${updated.title}"');
     try {
       setState(() {
@@ -219,14 +187,14 @@ class _FernDashboardState extends State<FernDashboard> {
         _sortConversations();
       });
     } catch (e) {
-      print('[Fern] _onConversationChanged setState error: $e');
+      print('[Ishtar] _onConversationChanged setState error: $e');
     }
-    print('[Fern] _onConversationChanged: now ${_conversations.length} chats');
+    print('[Ishtar] _onConversationChanged: now ${_conversations.length} chats');
     unawaited(_repository.saveConversations(_conversations));
   }
 
   void _openConversation(String id) {
-    _resetSearch();
+    _searchController.clear();
     setState(() {
       for (final conversation in _conversations) {
         if (conversation.id == id) {
@@ -239,45 +207,53 @@ class _FernDashboardState extends State<FernDashboard> {
   }
 
   void _toggleSidebar() {
-    if (_sidebarOpen) _resetSearch();
     setState(() => _sidebarOpen = !_sidebarOpen);
   }
 
-  Future<void> _showChatActions(FernConversation conversation) async {
-    final action = await showModalBottomSheet<_ChatAction>(
-      context: context,
-      backgroundColor: Colors.white,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const AppIcon(AppIcons.penLine),
-              title: const Text('Rename'),
-              onTap: () => Navigator.pop(context, _ChatAction.rename),
-            ),
-            ListTile(
-              leading: AppIcon(
-                conversation.pinned ? AppIcons.pinOff : AppIcons.pin,
-              ),
-              title: Text(conversation.pinned ? 'Unpin' : 'Pin'),
-              onTap: () => Navigator.pop(
-                context,
-                conversation.pinned ? _ChatAction.unpin : _ChatAction.pin,
-              ),
-            ),
-            ListTile(
-              leading: const AppIcon(AppIcons.trash, color: _dangerColor),
-              title: const Text(
-                'Delete',
-                style: TextStyle(color: _dangerColor),
-              ),
-              onTap: () => Navigator.pop(context, _ChatAction.delete),
-            ),
-          ],
-        ),
+  Future<void> _showChatActions(
+    BuildContext tileContext,
+    IshtarConversation conversation,
+  ) async {
+    final box = tileContext.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null || !box.hasSize) return;
+
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        box.localToGlobal(Offset.zero, ancestor: overlay),
+        box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
       ),
+      Offset.zero & overlay.size,
+    );
+
+    final action = await showMenu<_ChatAction>(
+      context: context,
+      position: position,
+      color: Colors.white,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      items: [
+        PopupMenuItem<_ChatAction>(
+          value: _ChatAction.rename,
+          child: const _ChatMenuItem(icon: AppIcons.penLine, label: 'Rename'),
+        ),
+        PopupMenuItem<_ChatAction>(
+          value: conversation.pinned ? _ChatAction.unpin : _ChatAction.pin,
+          child: _ChatMenuItem(
+            icon: conversation.pinned ? AppIcons.pinOff : AppIcons.pin,
+            label: conversation.pinned ? 'Unpin' : 'Pin',
+          ),
+        ),
+        PopupMenuItem<_ChatAction>(
+          value: _ChatAction.delete,
+          child: const _ChatMenuItem(
+            icon: AppIcons.trash,
+            label: 'Delete',
+            color: _dangerColor,
+          ),
+        ),
+      ],
     );
 
     if (!mounted || action == null) return;
@@ -298,7 +274,7 @@ class _FernDashboardState extends State<FernDashboard> {
     }
   }
 
-  Future<void> _renameConversation(FernConversation conversation) async {
+  Future<void> _renameConversation(IshtarConversation conversation) async {
     final newTitle = await showDialog<String>(
       context: context,
       builder: (_) => _RenameDialog(initialTitle: conversation.title),
@@ -326,7 +302,7 @@ class _FernDashboardState extends State<FernDashboard> {
     await _repository.saveConversations(_conversations);
   }
 
-  Future<void> _deleteConversation(FernConversation conversation) async {
+  Future<void> _deleteConversation(IshtarConversation conversation) async {
     setState(() {
       _conversations.removeWhere((c) => c.id == conversation.id);
       if (_active?.id == conversation.id) {
@@ -352,7 +328,7 @@ class _FernDashboardState extends State<FernDashboard> {
         children: [
           active == null
               ? const SizedBox.shrink()
-              : FernPage(
+              : IshtarPage(
                   key: ValueKey(active.id),
                   conversation: active,
                   onChanged: _onConversationChanged,
@@ -453,51 +429,7 @@ class _FernDashboardState extends State<FernDashboard> {
         alignment: Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            layoutBuilder: (currentChild, previousChildren) => Stack(
-              alignment: Alignment.centerLeft,
-              children: [...previousChildren, ?currentChild],
-            ),
-            child: _searchOpen ? _buildSearchField() : _buildHeaderIcons(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderIcons() {
-    return Row(
-      key: const ValueKey('header-icons'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(width: 4),
-        _buildSearchCircle(),
-        const SizedBox(width: 4),
-        IconButton(
-          tooltip: 'New chat',
-          onPressed: _newChat,
-          icon: const AppIcon(AppIcons.messageCirclePlus),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchCircle() {
-    return Material(
-      color: Colors.black,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: _openSearch,
-        child: const SizedBox(
-          width: 44,
-          height: 44,
-          child: Center(
-            child: AppIcon(AppIcons.search, size: 20, color: Colors.white),
-          ),
+          child: _buildSearchField(),
         ),
       ),
     );
@@ -506,7 +438,6 @@ class _FernDashboardState extends State<FernDashboard> {
   Widget _buildSearchField() {
     final surface = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SizedBox(
-      key: const ValueKey('header-search'),
       width: double.infinity,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -521,7 +452,6 @@ class _FernDashboardState extends State<FernDashboard> {
             Expanded(
               child: TextField(
                 controller: _searchController,
-                focusNode: _searchFocusNode,
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
                   hintText: 'Search chat content...',
@@ -567,6 +497,26 @@ class _FernDashboardState extends State<FernDashboard> {
 }
 
 enum _ChatAction { rename, pin, unpin, delete }
+
+class _ChatMenuItem extends StatelessWidget {
+  const _ChatMenuItem({required this.icon, required this.label, this.color});
+
+  final String icon;
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = color ?? const Color(0xFF1A1A1A);
+    return Row(
+      children: [
+        AppIcon(icon, color: foreground),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(color: foreground)),
+      ],
+    );
+  }
+}
 
 class _RenameDialog extends StatefulWidget {
   const _RenameDialog({required this.initialTitle});
