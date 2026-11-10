@@ -20,15 +20,16 @@ class FernDashboard extends StatefulWidget {
 
 class _FernDashboardState extends State<FernDashboard> {
   static const Color _sidebarColor = Color(0xFFF6F6F6);
-  static const Color _searchFill = Color(0xFFEFEFF0);
   static const Color _dangerColor = Color(0xFFE53935);
 
   final _repository = FernRepository();
   final _searchController = TextEditingController();
+  late final FocusNode _searchFocusNode;
   List<FernConversation> _conversations = [];
   FernConversation? _active;
   bool _sidebarOpen = false;
   bool _loaded = false;
+  bool _searchOpen = false;
 
   List<FernConversation> get _filteredConversations {
     final query = _searchController.text.trim().toLowerCase();
@@ -129,6 +130,7 @@ class _FernDashboardState extends State<FernDashboard> {
   @override
   void initState() {
     super.initState();
+    _searchFocusNode = FocusNode()..addListener(_onSearchFocusChanged);
     _searchController.addListener(_onSearchChanged);
     unawaited(_load());
     unawaited(_syncKeepMemories());
@@ -141,6 +143,8 @@ class _FernDashboardState extends State<FernDashboard> {
 
   @override
   void dispose() {
+    _searchFocusNode.removeListener(_onSearchFocusChanged);
+    _searchFocusNode.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
@@ -148,6 +152,35 @@ class _FernDashboardState extends State<FernDashboard> {
 
   void _onSearchChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onSearchFocusChanged() {
+    if (!_searchFocusNode.hasFocus) {
+      _resetSearch();
+    }
+  }
+
+  /// Collapses the search bar, clears its query and drops focus.
+  void _resetSearch() {
+    if (!_searchOpen) return;
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    setState(() => _searchOpen = false);
+  }
+
+  void _openSearch() {
+    setState(() => _searchOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _newChat() {
+    _resetSearch();
+    setState(() {
+      _active = _repository.createConversation();
+      _sidebarOpen = false;
+    });
   }
 
   Future<void> _load() async {
@@ -193,6 +226,7 @@ class _FernDashboardState extends State<FernDashboard> {
   }
 
   void _openConversation(String id) {
+    _resetSearch();
     setState(() {
       for (final conversation in _conversations) {
         if (conversation.id == id) {
@@ -205,6 +239,7 @@ class _FernDashboardState extends State<FernDashboard> {
   }
 
   void _toggleSidebar() {
+    if (_sidebarOpen) _resetSearch();
     setState(() => _sidebarOpen = !_sidebarOpen);
   }
 
@@ -368,36 +403,7 @@ class _FernDashboardState extends State<FernDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              height: 56,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search chat content...',
-                      prefixIcon: const AppIcon(AppIcons.search, size: 24),
-                      prefixIconConstraints: const BoxConstraints(
-                        minWidth: 24,
-                        minHeight: 24,
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      filled: true,
-                      fillColor: _searchFill,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(999),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            _buildSidebarHeader(),
             Expanded(
               child: conversations.isEmpty
                   ? const Center(
@@ -433,6 +439,110 @@ class _FernDashboardState extends State<FernDashboard> {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSidebarHeader() {
+    return SizedBox(
+      height: 56,
+      width: double.infinity,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            layoutBuilder: (currentChild, previousChildren) => Stack(
+              alignment: Alignment.centerLeft,
+              children: [...previousChildren, ?currentChild],
+            ),
+            child: _searchOpen ? _buildSearchField() : _buildHeaderIcons(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderIcons() {
+    return Row(
+      key: const ValueKey('header-icons'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(width: 4),
+        _buildSearchCircle(),
+        const SizedBox(width: 4),
+        IconButton(
+          tooltip: 'New chat',
+          onPressed: _newChat,
+          icon: const AppIcon(AppIcons.messageCirclePlus),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchCircle() {
+    return Material(
+      color: Colors.black,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _openSearch,
+        child: const SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: AppIcon(AppIcons.search, size: 20, color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    final surface = Theme.of(context).colorScheme.surfaceContainerHighest;
+    return SizedBox(
+      key: const ValueKey('header-search'),
+      width: double.infinity,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(50),
+        ),
+        child: Row(
+          children: [
+            const AppIcon(AppIcons.search, size: 20, color: Color(0xFF8E8E93)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  hintText: 'Search chat content...',
+                  isDense: true,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+            if (_searchController.text.isNotEmpty)
+              InkWell(
+                onTap: _searchController.clear,
+                child: const AppIcon(
+                  AppIcons.x,
+                  size: 16,
+                  color: Color(0xFF8E8E93),
+                ),
+              ),
           ],
         ),
       ),

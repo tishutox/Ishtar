@@ -292,7 +292,10 @@ class _AccountTile extends StatelessWidget {
             ),
             const SizedBox(width: 8),
           ],
-          AppIcon(AppIcons.chevronRight, color: accent, size: 20),
+          Transform.translate(
+            offset: const Offset(4, 0),
+            child: AppIcon(AppIcons.chevronRight, color: accent, size: 20),
+          ),
         ],
       ),
       onTap: onTap,

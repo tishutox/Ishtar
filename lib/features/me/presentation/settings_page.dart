@@ -8,6 +8,7 @@ import 'package:lumii_quest/features/profile/data/profile_repository.dart';
 import 'package:lumii_quest/features/profile/domain/user_profile.dart';
 import 'package:lumii_quest/widgets/settings_section.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -69,6 +70,16 @@ class _SettingsPageState extends State<SettingsPage> {
     await Supabase.instance.client.auth.signOut();
   }
 
+  Future<void> _openExternal(String url) async {
+    final uri = Uri.parse(url);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link could not be opened.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -114,27 +125,28 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: AppIcons.languages,
                   label: 'Language & Region',
                 ),
-                _SettingsTile(icon: AppIcons.bell, label: 'Notifications'),
                 _SettingsTile(
                   icon: AppIcons.accessibility,
                   label: 'Accessibility',
                 ),
-                _SettingsTile(icon: AppIcons.heart, label: 'Interests'),
               ],
             ),
           ),
           ContentLayout.sectionGap,
           ContentLayout.widthBox(
-            child: const SettingsSection(
-              title: 'Support',
+            child: SettingsSection(
+              title: 'Support Us',
               children: [
-                _SettingsTile(
-                  icon: AppIcons.lifeBuoy,
-                  label: 'Support Center',
+                _SettingsLinkTile(
+                  label: 'GitHub',
+                  icon: AppIcons.github,
+                  onTap: () => _openExternal('https://github.com/tishutox/Ishtar'),
                 ),
-                _SettingsTile(
-                  icon: AppIcons.messageSquareText,
-                  label: 'Share Feedback',
+                _SettingsLinkTile(
+                  label: 'Instagram',
+                  icon: AppIcons.instagram,
+                  onTap: () =>
+                      _openExternal('https://www.instagram.com/ishtar.ong'),
                 ),
               ],
             ),
@@ -332,7 +344,10 @@ class _SettingsTile extends StatelessWidget {
     return ListTile(
       leading: AppIcon(icon, color: primary),
       title: Text(label),
-      trailing: AppIcon(AppIcons.chevronRight, color: primary),
+      trailing: Transform.translate(
+        offset: const Offset(4, 0),
+        child: AppIcon(AppIcons.chevronRight, color: primary),
+      ),
     );
   }
 }
@@ -350,7 +365,10 @@ class _SettingsLinkTile extends StatelessWidget {
     return ListTile(
       leading: icon == null ? null : AppIcon(icon!, color: primary),
       title: Text(label),
-      trailing: AppIcon(AppIcons.chevronRight, color: primary),
+      trailing: Transform.translate(
+        offset: const Offset(4, 0),
+        child: AppIcon(AppIcons.chevronRight, color: primary),
+      ),
       onTap: onTap,
     );
   }

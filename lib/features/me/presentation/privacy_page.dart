@@ -124,7 +124,10 @@ class _PrivacyLinkTile extends StatelessWidget {
     final primary = Theme.of(context).colorScheme.primary;
     return ListTile(
       title: Text(label),
-      trailing: AppIcon(AppIcons.chevronRight, color: primary),
+      trailing: Transform.translate(
+        offset: const Offset(4, 0),
+        child: AppIcon(AppIcons.chevronRight, color: primary),
+      ),
     );
   }
 }

@@ -43,6 +43,7 @@ abstract final class AppIcons {
   static const file = 'file';
   static const fingerprintPattern = 'fingerprint-pattern';
   static const gamepad2 = 'gamepad-2';
+  static const github = 'github';
   static const graduationCap = 'graduation-cap';
   static const handFist = 'hand-fist';
   static const headphones = 'headphones';
@@ -53,6 +54,7 @@ abstract final class AppIcons {
   static const image = 'image';
   static const imageOff = 'image-off';
   static const imageUp = 'image-up';
+  static const instagram = 'instagram';
   static const languages = 'languages';
   static const layoutGridCircles = 'layout-grid-circles';
   static const lifeBuoy = 'life-buoy';
