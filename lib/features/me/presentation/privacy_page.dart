@@ -6,6 +6,7 @@ import 'package:lumii_quest/core/icons/app_icons.dart';
 import 'package:lumii_quest/core/responsive/content_layout.dart';
 import 'package:lumii_quest/features/account/data/account_repository.dart';
 import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
+import 'package:lumii_quest/features/me/data/pin_service.dart';
 import 'package:lumii_quest/widgets/settings_section.dart';
 
 const Color _onColor = Color(0xFF34C759);
@@ -22,6 +23,7 @@ class PrivacyPage extends StatefulWidget {
 class _PrivacyPageState extends State<PrivacyPage> {
   final _repository = AccountRepository();
   bool _keepMemories = true;
+  bool _pinEnabled = false;
   bool _saving = false;
 
   @override
@@ -32,9 +34,13 @@ class _PrivacyPageState extends State<PrivacyPage> {
 
   Future<void> _load() async {
     final value = await _repository.getKeepMemories();
+    final pinEnabled = await PinService().isEnabled();
     LocalLlmService.instance.keepMemories = value;
     if (mounted) {
-      setState(() => _keepMemories = value);
+      setState(() {
+        _keepMemories = value;
+        _pinEnabled = pinEnabled;
+      });
     }
   }
 
@@ -72,12 +78,17 @@ class _PrivacyPageState extends State<PrivacyPage> {
         padding: ContentLayout.pagePadding,
         children: [
           ContentLayout.widthBox(
-            child: const SettingsSection(
+            child: SettingsSection(
               title: 'Safety',
               dividerIndent: 16,
               children: [
-                _PrivacyLinkTile(label: 'Blocked Users'),
-                _PrivacyLinkTile(label: 'Support'),
+                const _PrivacyLinkTile(label: 'Blocked Users'),
+                const _PrivacyLinkTile(label: 'Support'),
+                _PrivacyLinkTile(
+                  label: 'Log-In Pin',
+                  subtitle: _pinEnabled ? 'On' : 'Off',
+                  onTap: () => context.push('/login-pin'),
+                ),
               ],
             ),
           ),
@@ -118,16 +129,23 @@ class _PrivacyPageState extends State<PrivacyPage> {
 }
 
 class _PrivacyLinkTile extends StatelessWidget {
-  const _PrivacyLinkTile({required this.label, this.onTap});
+  const _PrivacyLinkTile({required this.label, this.subtitle, this.onTap});
 
   final String label;
+  final String? subtitle;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final muted = Theme.of(
+      context,
+    ).colorScheme.onSurface.withValues(alpha: 0.62);
     return ListTile(
       title: Text(label),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle!, style: TextStyle(color: muted, fontSize: 13)),
       trailing: Transform.translate(
         offset: const Offset(4, 0),
         child: AppIcon(AppIcons.chevronRight, color: primary),
