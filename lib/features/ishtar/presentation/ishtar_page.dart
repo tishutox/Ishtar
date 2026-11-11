@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 const Color ishtarGreen = Color(0xFF34C759);
+const Color ishtarCloud = Color(0xFFFFA000);
 
 /// Local-only chat with Ishtar, the built-in AI assistant.
 ///
@@ -565,6 +566,10 @@ class _IshtarPageState extends State<IshtarPage> {
             style: useLocal
                 ? IconButton.styleFrom(
                     backgroundColor: ishtarGreen.withValues(alpha: 0.18),
+                  )
+                : _modelDownloaded
+                ? IconButton.styleFrom(
+                    backgroundColor: ishtarCloud.withValues(alpha: 0.18),
                   )
                 : null,
             icon: _downloadingModel
@@ -1423,7 +1428,7 @@ class _TypeTag extends StatelessWidget {
                 type.label,
                 style: TextStyle(
                   color: foreground,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w400,
                   fontSize: 14,
                 ),
               ),

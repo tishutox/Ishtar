@@ -83,11 +83,14 @@ class _PrivacyPageState extends State<PrivacyPage> {
           ),
           ContentLayout.sectionGap,
           ContentLayout.widthBox(
-            child: const SettingsSection(
+            child: SettingsSection(
               title: 'Data Privacy',
               dividerIndent: 16,
               children: [
-                _PrivacyLinkTile(label: 'Privacy Policy'),
+                _PrivacyLinkTile(
+                  label: 'Privacy Policy',
+                  onTap: () => context.push('/privacy-policy'),
+                ),
               ],
             ),
           ),
@@ -115,9 +118,10 @@ class _PrivacyPageState extends State<PrivacyPage> {
 }
 
 class _PrivacyLinkTile extends StatelessWidget {
-  const _PrivacyLinkTile({required this.label});
+  const _PrivacyLinkTile({required this.label, this.onTap});
 
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -128,6 +132,7 @@ class _PrivacyLinkTile extends StatelessWidget {
         offset: const Offset(4, 0),
         child: AppIcon(AppIcons.chevronRight, color: primary),
       ),
+      onTap: onTap,
     );
   }
 }

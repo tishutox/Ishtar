@@ -28,6 +28,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
   IshtarConversation? _active;
   bool _sidebarOpen = false;
   bool _loaded = false;
+  double _swipeDelta = 0;
 
   List<IshtarConversation> get _filteredConversations {
     final query = _searchController.text.trim().toLowerCase();
@@ -210,6 +211,30 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
     setState(() => _sidebarOpen = !_sidebarOpen);
   }
 
+  void _newChat() {
+    _searchController.clear();
+    setState(() {
+      _active = _repository.createConversation();
+      _sidebarOpen = false;
+    });
+  }
+
+  void _onSwipeStart(DragStartDetails details) {
+    _swipeDelta = 0;
+  }
+
+  void _onSwipeUpdate(DragUpdateDetails details) {
+    _swipeDelta += details.delta.dx;
+  }
+
+  void _onSwipeEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (!_sidebarOpen && (_swipeDelta > 60 || velocity > 300)) {
+      setState(() => _sidebarOpen = true);
+    }
+    _swipeDelta = 0;
+  }
+
   Future<void> _showChatActions(
     BuildContext tileContext,
     IshtarConversation conversation,
@@ -336,19 +361,25 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
 
     final active = _active;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final sidebarWidth = (screenWidth * 0.80).clamp(0.0, 300.0).toDouble();
+    final sidebarWidth = (screenWidth * 0.85).clamp(0.0, 340.0).toDouble();
 
     return Scaffold(
       body: Stack(
         children: [
-          active == null
-              ? const SizedBox.shrink()
-              : IshtarPage(
-                  key: ValueKey(active.id),
-                  conversation: active,
-                  onChanged: _onConversationChanged,
-                  onToggleSidebar: _toggleSidebar,
-                ),
+          GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: _onSwipeStart,
+            onHorizontalDragUpdate: _onSwipeUpdate,
+            onHorizontalDragEnd: _onSwipeEnd,
+            child: active == null
+                ? const SizedBox.shrink()
+                : IshtarPage(
+                    key: ValueKey(active.id),
+                    conversation: active,
+                    onChanged: _onConversationChanged,
+                    onToggleSidebar: _toggleSidebar,
+                  ),
+          ),
           Positioned.fill(
             child: IgnorePointer(
               ignoring: !_sidebarOpen,
@@ -390,48 +421,69 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
     return Container(
       width: width,
       color: _sidebarColor,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildSidebarHeader(),
-            Expanded(
-              child: conversations.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No chats yet',
-                        style: TextStyle(color: Color(0xFF8E8E93)),
+      child: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildSidebarHeader(),
+                Expanded(
+                  child: conversations.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No chats yet',
+                            style: TextStyle(color: Color(0xFF8E8E93)),
+                          ),
+                        )
+                      : ListView(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          children: _buildChatListItems(conversations),
+                        ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _buildAvatar(),
+                      const SizedBox(width: 12),
+                      _buildNewChatButton(),
+                      const SizedBox(width: 12),
+                      FilledButton(
+                        onPressed: () => context.push('/settings'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: const Text(
+                          'Settings',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      children: _buildChatListItems(conversations),
-                    ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _buildAvatar(),
-                  const SizedBox(width: 12),
-                  FilledButton(
-                    onPressed: () => context.push('/settings'),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: const Text(
-                      'Settings',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Container(
+                width: 4,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC7C7CC),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -489,6 +541,31 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewChatButton() {
+    return Tooltip(
+      message: 'New chat',
+      child: Material(
+        color: Colors.black,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _newChat,
+          child: const SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: AppIcon(
+                AppIcons.messageCirclePlus,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
         ),
       ),
     );
