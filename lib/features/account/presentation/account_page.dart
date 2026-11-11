@@ -58,6 +58,23 @@ class _AccountPageState extends State<AccountPage> {
   String get _email =>
       Supabase.instance.client.auth.currentUser?.email ?? '';
 
+  String? get _birthday {
+    final raw =
+        Supabase.instance.client.auth.currentUser?.userMetadata?['birthday'];
+    return raw is String && raw.isNotEmpty ? raw : null;
+  }
+
+  DateTime? get _birthdayDate =>
+      _birthday == null ? null : DateTime.tryParse(_birthday!);
+
+  String get _birthdayDisplay {
+    final value = _birthday;
+    if (value == null) return '';
+    final parts = value.split('-');
+    if (parts.length != 3) return value;
+    return '${parts[2]}.${parts[1]}.${parts[0]}';
+  }
+
   void _showSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(
@@ -120,10 +137,34 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
-  Future<void> _changePassword() async {
-    final newPassword = await showDialog<String>(
+  Future<void> _editBirthday() async {
+    final selected = await showModalBottomSheet<DateTime>(
       context: context,
-      builder: (_) => const _ChangePasswordDialog(),
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _BirthdaySheet(initialDate: _birthdayDate),
+    );
+    if (selected == null || !mounted) return;
+    try {
+      await _repository.updateBirthday(
+        selected.toIso8601String().split('T').first,
+      );
+      if (!mounted) return;
+      _showSnackBar('Birthday updated.');
+      setState(() {});
+    } catch (error) {
+      _showSnackBar('Birthday could not be updated: $error');
+    }
+  }
+
+  Future<void> _changePassword() async {
+    final newPassword = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _PasswordSheet(),
     );
     if (newPassword == null || !mounted) return;
     try {
@@ -135,29 +176,12 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Future<void> _deleteAccount() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete account?'),
-        content: const Text(
-          'This permanently deletes your account, profile, friendships, notifications and chats. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            icon: const AppIcon(AppIcons.trash),
-            label: const Text('Delete account'),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _DeleteAccountSheet(),
     );
     if (confirmed != true || !mounted) {
       return;
@@ -180,9 +204,12 @@ class _AccountPageState extends State<AccountPage> {
     String? prefixText,
     TextCapitalization textCapitalization = TextCapitalization.sentences,
   }) {
-    return showDialog<String>(
+    return showModalBottomSheet<String>(
       context: context,
-      builder: (_) => _TextPromptDialog(
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _TextInputSheet(
         title: title,
         label: label,
         initialValue: initialValue,
@@ -227,6 +254,11 @@ class _AccountPageState extends State<AccountPage> {
                   label: 'Email',
                   value: _email,
                   onTap: _editEmail,
+                ),
+                _AccountTile(
+                  label: 'Birthday',
+                  value: _birthdayDisplay,
+                  onTap: _editBirthday,
                 ),
               ],
             ),
@@ -303,8 +335,8 @@ class _AccountTile extends StatelessWidget {
   }
 }
 
-class _TextPromptDialog extends StatefulWidget {
-  const _TextPromptDialog({
+class _TextInputSheet extends StatefulWidget {
+  const _TextInputSheet({
     required this.title,
     required this.label,
     required this.initialValue,
@@ -323,10 +355,10 @@ class _TextPromptDialog extends StatefulWidget {
   final TextCapitalization textCapitalization;
 
   @override
-  State<_TextPromptDialog> createState() => _TextPromptDialogState();
+  State<_TextInputSheet> createState() => _TextInputSheetState();
 }
 
-class _TextPromptDialogState extends State<_TextPromptDialog> {
+class _TextInputSheetState extends State<_TextInputSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _controller = TextEditingController(
     text: widget.initialValue,
@@ -339,39 +371,288 @@ class _TextPromptDialogState extends State<_TextPromptDialog> {
   }
 
   void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     Navigator.of(context).pop(_controller.text.trim());
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _controller,
-          autofocus: true,
-          keyboardType: widget.keyboardType,
-          textCapitalization: widget.textCapitalization,
-          decoration: InputDecoration(
-            labelText: widget.label,
-            prefixText: widget.prefixText,
-            border: const OutlineInputBorder(),
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Form(
+                key: _formKey,
+                child: TextFormField(
+                  controller: _controller,
+                  autofocus: true,
+                  keyboardType: widget.keyboardType,
+                  textCapitalization: widget.textCapitalization,
+                  decoration: InputDecoration(
+                    labelText: widget.label,
+                    prefixText: widget.prefixText,
+                  ),
+                  validator: widget.validator,
+                  onFieldSubmitted: (_) => _submit(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    minimumSize: const Size(0, 48),
+                  ),
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
           ),
-          validator: widget.validator,
-          onFieldSubmitted: (_) => _submit(),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+    );
+  }
+}
+
+class _PasswordSheet extends StatefulWidget {
+  const _PasswordSheet();
+
+  @override
+  State<_PasswordSheet> createState() => _PasswordSheetState();
+}
+
+class _PasswordSheetState extends State<_PasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    Navigator.of(context).pop(_newPasswordController.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Change password',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: _newPasswordController,
+                      obscureText: _obscure,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: 'New password',
+                        suffixIcon: IconButton(
+                          tooltip: _obscure ? 'Show password' : 'Hide password',
+                          onPressed: () =>
+                              setState(() => _obscure = !_obscure),
+                          icon: AppIcon(
+                            _obscure ? AppIcons.eye : AppIcons.eyeOff,
+                          ),
+                        ),
+                      ),
+                      validator: _passwordValidator,
+                      onFieldSubmitted: (_) => _submit(),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscure,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm password',
+                      ),
+                      validator: (value) {
+                        if (value != _newPasswordController.text) {
+                          return 'Passwords do not match.';
+                        }
+                        return _passwordValidator(value);
+                      },
+                      onFieldSubmitted: (_) => _submit(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    minimumSize: const Size(0, 48),
+                  ),
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
+          ),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Save')),
-      ],
+      ),
+    );
+  }
+}
+
+class _DeleteAccountSheet extends StatelessWidget {
+  const _DeleteAccountSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final error = Theme.of(context).colorScheme.error;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Delete account?',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This permanently deletes your account, profile, friendships, '
+              'notifications and chats. This cannot be undone.',
+              style: TextStyle(color: Color(0xFF8E8E93)),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      shape: const StadiumBorder(),
+                      minimumSize: const Size(0, 48),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                      shape: const StadiumBorder(),
+                      minimumSize: const Size(0, 48),
+                    ),
+                    child: const Text('Delete'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BirthdaySheet extends StatefulWidget {
+  const _BirthdaySheet({this.initialDate});
+
+  final DateTime? initialDate;
+
+  @override
+  State<_BirthdaySheet> createState() => _BirthdaySheetState();
+}
+
+class _BirthdaySheetState extends State<_BirthdaySheet> {
+  late DateTime _date;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _date =
+        widget.initialDate ?? DateTime(now.year - 18, now.month, now.day);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Birthday',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 400,
+              child: CalendarDatePicker(
+                initialDate: _date,
+                firstDate: DateTime(now.year - 120),
+                lastDate: now,
+                onDateChanged: (date) => setState(() => _date = date),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(_date),
+                style: FilledButton.styleFrom(
+                  shape: const StadiumBorder(),
+                  minimumSize: const Size(0, 48),
+                ),
+                child: const Text('Done'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -415,88 +696,4 @@ String? _passwordValidator(String? value) {
     return 'Password needs at least 8 characters.';
   }
   return null;
-}
-
-class _ChangePasswordDialog extends StatefulWidget {
-  const _ChangePasswordDialog();
-
-  @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
-}
-
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool _obscure = true;
-
-  @override
-  void dispose() {
-    _newPasswordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
-    Navigator.of(context).pop(_newPasswordController.text.trim());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Change password'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: _newPasswordController,
-              obscureText: _obscure,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'New password',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  tooltip: _obscure ? 'Show password' : 'Hide password',
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                  icon: AppIcon(
-                    _obscure ? AppIcons.eye : AppIcons.eyeOff,
-                  ),
-                ),
-              ),
-              validator: _passwordValidator,
-              onFieldSubmitted: (_) => _submit(),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _confirmPasswordController,
-              obscureText: _obscure,
-              decoration: const InputDecoration(
-                labelText: 'Confirm password',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value != _newPasswordController.text) {
-                  return 'Passwords do not match.';
-                }
-                return _passwordValidator(value);
-              },
-              onFieldSubmitted: (_) => _submit(),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _submit, child: const Text('Save')),
-      ],
-    );
-  }
 }

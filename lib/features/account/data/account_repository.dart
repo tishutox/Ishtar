@@ -50,6 +50,14 @@ class AccountRepository {
     await _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 
+  /// Stores the birthday as `YYYY-MM-DD` in the auth user metadata (the same
+  /// place the sign-up wizard writes it).
+  Future<void> updateBirthday(String birthday) async {
+    await _client.auth.updateUser(
+      UserAttributes(data: {'birthday': birthday}),
+    );
+  }
+
   /// Whether the local AI keeps its memories between chats. Defaults to true
   /// (on) when the user is signed out or the row is missing.
   Future<bool> getKeepMemories() async {

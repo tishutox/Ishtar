@@ -380,8 +380,8 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
 
     final active = _active;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final contentWidth = (screenWidth * 0.80).clamp(0.0, 300.0).toDouble();
-    const grabBufferWidth = 16.0;
+    final contentWidth = (screenWidth * 0.75).clamp(0.0, 280.0).toDouble();
+    const grabBufferWidth = 32.0;
     final sidebarWidth = contentWidth + grabBufferWidth;
 
     return Scaffold(
@@ -443,85 +443,87 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
     double bufferWidth,
   ) {
     final conversations = _filteredConversations;
-    return Container(
-      width: contentWidth + bufferWidth,
-      color: _sidebarColor,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            width: contentWidth,
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildSidebarHeader(),
-                  Expanded(
-                    child: conversations.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No chats yet',
-                              style: TextStyle(color: Color(0xFF8E8E93)),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: _onGrabStart,
+      onHorizontalDragUpdate: _onGrabUpdate,
+      onHorizontalDragEnd: _onGrabEnd,
+      child: Container(
+        width: contentWidth + bufferWidth,
+        color: _sidebarColor,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: contentWidth,
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildSidebarHeader(),
+                    Expanded(
+                      child: conversations.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No chats yet',
+                                style: TextStyle(color: Color(0xFF8E8E93)),
+                              ),
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              children: _buildChatListItems(conversations),
                             ),
-                          )
-                        : ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            children: _buildChatListItems(conversations),
-                          ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _buildAvatar(),
-                        const SizedBox(width: 12),
-                        _buildNewChatButton(),
-                        const SizedBox(width: 12),
-                        FilledButton(
-                          onPressed: () => context.push('/settings'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 40),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                            ),
-                            shape: const StadiumBorder(),
-                          ),
-                          child: const Text(
-                            'Settings',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
                     ),
-                  ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _buildAvatar(),
+                          const SizedBox(width: 12),
+                          _buildNewChatButton(),
+                          const SizedBox(width: 12),
+                          FilledButton(
+                            onPressed: () => context.push('/settings'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 40),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              shape: const StadiumBorder(),
+                            ),
+                            child: const Text(
+                              'Settings',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          SizedBox(
-            width: bufferWidth,
-            child: _buildGrabHandle(),
-          ),
-        ],
+            SizedBox(
+              width: bufferWidth,
+              child: _buildGrabHandle(),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildGrabHandle() {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragStart: _onGrabStart,
-      onHorizontalDragUpdate: _onGrabUpdate,
-      onHorizontalDragEnd: _onGrabEnd,
-      child: Center(
-        child: Container(
-          width: 4,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFC7C7CC),
-            borderRadius: BorderRadius.circular(2),
-          ),
+    return Center(
+      child: Container(
+        width: 4,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          borderRadius: BorderRadius.circular(2),
         ),
       ),
     );

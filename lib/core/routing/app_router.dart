@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 export 'package:lumii_quest/core/routing/profile_links.dart';
 import 'package:lumii_quest/features/account/presentation/account_page.dart';
 import 'package:lumii_quest/features/me/presentation/own_profile_page.dart';
-import 'package:lumii_quest/features/me/presentation/pin_setup_page.dart';
 import 'package:lumii_quest/features/me/presentation/privacy_page.dart';
 import 'package:lumii_quest/features/me/presentation/privacy_policy_page.dart';
 import 'package:lumii_quest/features/me/presentation/settings_page.dart';
@@ -21,7 +20,6 @@ final appRouter = GoRouter(
       path: '/privacy-policy',
       builder: (_, _) => const PrivacyPolicyPage(),
     ),
-    GoRoute(path: '/login-pin', builder: (_, _) => const PinSetupPage()),
     GoRoute(path: '/edit-profile', builder: (_, _) => const EditProfilePage()),
     GoRoute(path: '/own-profile', builder: (_, _) => const OwnProfilePage()),
     GoRoute(
