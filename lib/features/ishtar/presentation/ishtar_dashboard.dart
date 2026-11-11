@@ -219,13 +219,28 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (box == null || overlay == null || !box.hasSize) return;
 
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        box.localToGlobal(Offset.zero, ancestor: overlay),
-        box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
-      ),
-      Offset.zero & overlay.size,
-    );
+    // Anchor the menu next to the tile — to its right and below it (or above
+    // it when there is not enough room below) — so it no longer covers the
+    // chat it belongs to.
+    final tileTopLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final tileBottomRight =
+        box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay);
+    const horizontalGap = 8.0;
+    const verticalGap = 4.0;
+    // Approximate height of the three-item menu. `showMenu` clamps it to the
+    // overlay anyway, so a small over/under-estimate is harmless.
+    const estimatedMenuHeight = 160.0;
+    final placeBelow =
+        tileBottomRight.dy + verticalGap + estimatedMenuHeight <=
+        overlay.size.height;
+    final left = tileBottomRight.dx + horizontalGap;
+    final top = (placeBelow
+            ? tileBottomRight.dy + verticalGap
+            : tileTopLeft.dy - estimatedMenuHeight - verticalGap)
+        .clamp(0.0, overlay.size.height)
+        .toDouble();
+
+    final position = RelativeRect.fromLTRB(left, top, left, top);
 
     final action = await showMenu<_ChatAction>(
       context: context,

@@ -27,6 +27,7 @@ abstract final class AppIcons {
   static const cloud = 'cloud';
   static const code = 'code';
   static const compass = 'compass';
+  static const copy = 'copy';
   static const cpu = 'cpu';
   static const download = 'download';
   static const dumbbell = 'dumbbell';
@@ -79,6 +80,7 @@ abstract final class AppIcons {
   static const penLine = 'pen-line';
   static const phone = 'phone';
   static const piggyBank = 'piggy-bank';
+  static const pill = 'pill';
   static const pin = 'pin';
   static const pinOff = 'pin-off';
   static const play = 'play';
@@ -105,6 +107,7 @@ abstract final class AppIcons {
   static const userX = 'user-round-x';
   static const usersRoundCollaboration = 'users-round-collaboration';
   static const venetianMask = 'venetian-mask';
+  static const venus = 'venus';
   static const video = 'video';
   static const videoOff = 'video-off';
   static const volume2 = 'volume-2';

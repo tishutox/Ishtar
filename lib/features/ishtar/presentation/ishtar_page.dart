@@ -11,6 +11,7 @@ import 'package:lumii_quest/features/ishtar/data/ai_type.dart';
 import 'package:lumii_quest/features/ishtar/data/ishtar_repository.dart';
 import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
 import 'package:lumii_quest/features/ishtar/data/media_file_io.dart';
+import 'package:lumii_quest/features/ishtar/presentation/code_highlight.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -724,8 +725,8 @@ class _IshtarMediaInputBar extends StatelessWidget {
                 controller: controller,
                 minLines: 1,
                 maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
                 decoration: const InputDecoration(
                   hintText: 'Message Ishtar',
                   border: InputBorder.none,
@@ -811,8 +812,8 @@ class _IshtarTextInputBar extends StatelessWidget {
               minLines: 1,
               maxLines: 4,
               enabled: !isSending,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => onSend(),
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
                 hintText: 'Message Ishtar',
                 border: OutlineInputBorder(
@@ -1077,14 +1078,7 @@ class _IshtarBubble extends StatelessWidget {
           return Container(
             width: double.infinity,
             margin: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              message.content,
-              style: const TextStyle(
-                color: Color(0xFF1A1A1A),
-                fontSize: 15,
-                height: 1.35,
-              ),
-            ),
+            child: _AssistantMessageView(content: message.content),
           );
         }
         return Align(
@@ -1439,4 +1433,257 @@ class _TypeTag extends StatelessWidget {
       ),
     );
   }
+}
+
+final RegExp _fenceOpen = RegExp(r'^[ \t]*```[ \t]*([\w+#.-]*)[ \t]*$');
+final RegExp _fenceClose = RegExp(r'^[ \t]*```[ \t]*$');
+
+/// A parsed chunk of an assistant reply: either prose or one fenced code
+/// block.
+class _MessageSegment {
+  const _MessageSegment.text(String this.text)
+      : language = null,
+        code = null;
+
+  const _MessageSegment.code(String this.language, String this.code)
+      : text = null;
+
+  final String? text;
+  final String? language;
+  final String? code;
+
+  bool get isCode => code != null;
+}
+
+/// Splits an assistant reply into prose and ```fenced code blocks```.
+List<_MessageSegment> _parseMessage(String content) {
+  final segments = <_MessageSegment>[];
+  final lines = content.split('\n');
+  var i = 0;
+  var textStart = 0;
+
+  void flushText(int end) {
+    if (end > textStart) {
+      segments.add(
+        _MessageSegment.text(lines.sublist(textStart, end).join('\n')),
+      );
+    }
+  }
+
+  while (i < lines.length) {
+    final open = _fenceOpen.firstMatch(lines[i]);
+    if (open == null) {
+      i++;
+      continue;
+    }
+    flushText(i);
+    final language = (open.group(1) ?? '').trim();
+    final codeStart = i + 1;
+    var j = codeStart;
+    while (j < lines.length && !_fenceClose.hasMatch(lines[j])) {
+      j++;
+    }
+    segments.add(_MessageSegment.code(language, lines.sublist(codeStart, j).join('\n')));
+    i = j + 1; // skip the closing fence (if present)
+    textStart = i;
+  }
+  flushText(lines.length);
+  return segments;
+}
+
+/// Renders an assistant reply, turning fenced code blocks into highlighted,
+/// copyable boxes.
+class _AssistantMessageView extends StatelessWidget {
+  const _AssistantMessageView({required this.content});
+
+  final String content;
+
+  @override
+  Widget build(BuildContext context) {
+    final segments = _parseMessage(content);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final segment in segments)
+          if (segment.isCode)
+            _CodeBlock(language: segment.language ?? '', code: segment.code ?? '')
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                segment.text ?? '',
+                style: const TextStyle(
+                  color: Color(0xFF1A1A1A),
+                  fontSize: 15,
+                  height: 1.35,
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+/// A rounded, dark code block with a language label, a "Copy" action and a
+/// horizontally scrollable, syntax-highlighted body.
+class _CodeBlock extends StatefulWidget {
+  const _CodeBlock({required this.language, required this.code});
+
+  final String language;
+  final String code;
+
+  @override
+  State<_CodeBlock> createState() => _CodeBlockState();
+}
+
+class _CodeBlockState extends State<_CodeBlock> {
+  static const Color _background = Color(0xFFF6F6F6);
+  static const Color _border = Color(0xFFE4E4E8);
+  static const Color _muted = Color(0xFF8E8E93);
+  static const Color _divider = Color(0xFFE4E4E8);
+
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.code));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: _background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+            child: Row(
+              children: [
+                Text(
+                  _displayLabel(widget.language),
+                  style: const TextStyle(
+                    color: _muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: _copy,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const AppIcon(AppIcons.copy, size: 13, color: _muted),
+                        const SizedBox(width: 5),
+                        Text(
+                          _copied ? 'Copied' : 'Copy',
+                          style: const TextStyle(color: _muted, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 1, color: _divider),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: _buildCode(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCode() {
+    final tokens = tokenizeCode(widget.code, widget.language);
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(
+          color: Color(0xFF1A1A1A),
+          fontSize: 13,
+          height: 1.45,
+        ),
+        children: [
+          for (final token in tokens)
+            TextSpan(
+              text: token.text,
+              style: TextStyle(color: _codeColor(token.type)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+Color _codeColor(CodeTokenType type) {
+  switch (type) {
+    case CodeTokenType.keyword:
+      return const Color(0xFFCF222E);
+    case CodeTokenType.type:
+      return const Color(0xFF953800);
+    case CodeTokenType.function:
+      return const Color(0xFF8250DF);
+    case CodeTokenType.string:
+      return const Color(0xFF0A3069);
+    case CodeTokenType.comment:
+      return const Color(0xFF6E7781);
+    case CodeTokenType.number:
+      return const Color(0xFF0550AE);
+    case CodeTokenType.tag:
+      return const Color(0xFF116329);
+    case CodeTokenType.attribute:
+      return const Color(0xFF953800);
+    case CodeTokenType.plain:
+      return const Color(0xFF1A1A1A);
+  }
+}
+
+String _displayLabel(String language) {
+  final lang = normalizeLanguage(language);
+  const names = {
+    'python': 'Python',
+    'java': 'Java',
+    'javascript': 'JavaScript',
+    'typescript': 'TypeScript',
+    'html': 'HTML',
+    'css': 'CSS',
+    'bash': 'Bash',
+    'json': 'JSON',
+    'yaml': 'YAML',
+    'markdown': 'Markdown',
+    'c': 'C',
+    'cpp': 'C++',
+    'csharp': 'C#',
+    'kotlin': 'Kotlin',
+    'swift': 'Swift',
+    'dart': 'Dart',
+    'go': 'Go',
+    'rust': 'Rust',
+    'php': 'PHP',
+    'ruby': 'Ruby',
+    'sql': 'SQL',
+  };
+  final name = names[lang];
+  if (name != null) return name;
+  if (lang.isEmpty || lang == 'plain') return 'Code';
+  return lang[0].toUpperCase() + lang.substring(1);
 }
