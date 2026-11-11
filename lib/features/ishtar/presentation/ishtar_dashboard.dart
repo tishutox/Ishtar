@@ -29,6 +29,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
   bool _sidebarOpen = false;
   bool _loaded = false;
   double _swipeDelta = 0;
+  double _grabDelta = 0;
 
   List<IshtarConversation> get _filteredConversations {
     final query = _searchController.text.trim().toLowerCase();
@@ -235,6 +236,24 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
     _swipeDelta = 0;
   }
 
+  void _onGrabStart(DragStartDetails details) {
+    _grabDelta = 0;
+  }
+
+  void _onGrabUpdate(DragUpdateDetails details) {
+    _grabDelta += details.delta.dx;
+  }
+
+  void _onGrabEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (_grabDelta < -40 || velocity < -300) {
+      if (_sidebarOpen) setState(() => _sidebarOpen = false);
+    } else if (_grabDelta > 40 || velocity > 300) {
+      if (!_sidebarOpen) setState(() => _sidebarOpen = true);
+    }
+    _grabDelta = 0;
+  }
+
   Future<void> _showChatActions(
     BuildContext tileContext,
     IshtarConversation conversation,
@@ -361,7 +380,9 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
 
     final active = _active;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final sidebarWidth = (screenWidth * 0.85).clamp(0.0, 340.0).toDouble();
+    final contentWidth = (screenWidth * 0.80).clamp(0.0, 300.0).toDouble();
+    const grabBufferWidth = 16.0;
+    final sidebarWidth = contentWidth + grabBufferWidth;
 
     return Scaffold(
       body: Stack(
@@ -407,7 +428,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
                 borderRadius: const BorderRadius.horizontal(
                   right: Radius.circular(24),
                 ),
-                child: _buildSidebar(context, sidebarWidth),
+                child: _buildSidebar(context, contentWidth, grabBufferWidth),
               ),
             ),
           ),
@@ -416,74 +437,92 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
     );
   }
 
-  Widget _buildSidebar(BuildContext context, double width) {
+  Widget _buildSidebar(
+    BuildContext context,
+    double contentWidth,
+    double bufferWidth,
+  ) {
     final conversations = _filteredConversations;
     return Container(
-      width: width,
+      width: contentWidth + bufferWidth,
       color: _sidebarColor,
-      child: Stack(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildSidebarHeader(),
-                Expanded(
-                  child: conversations.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No chats yet',
-                            style: TextStyle(color: Color(0xFF8E8E93)),
+          SizedBox(
+            width: contentWidth,
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildSidebarHeader(),
+                  Expanded(
+                    child: conversations.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No chats yet',
+                              style: TextStyle(color: Color(0xFF8E8E93)),
+                            ),
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            children: _buildChatListItems(conversations),
                           ),
-                        )
-                      : ListView(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          children: _buildChatListItems(conversations),
-                        ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _buildAvatar(),
-                      const SizedBox(width: 12),
-                      _buildNewChatButton(),
-                      const SizedBox(width: 12),
-                      FilledButton(
-                        onPressed: () => context.push('/settings'),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 40),
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          shape: const StadiumBorder(),
-                        ),
-                        child: const Text(
-                          'Settings',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Container(
-                width: 4,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFC7C7CC),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _buildAvatar(),
+                        const SizedBox(width: 12),
+                        _buildNewChatButton(),
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: () => context.push('/settings'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                            ),
+                            shape: const StadiumBorder(),
+                          ),
+                          child: const Text(
+                            'Settings',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+          SizedBox(
+            width: bufferWidth,
+            child: _buildGrabHandle(),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGrabHandle() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: _onGrabStart,
+      onHorizontalDragUpdate: _onGrabUpdate,
+      onHorizontalDragEnd: _onGrabEnd,
+      child: Center(
+        child: Container(
+          width: 4,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFFC7C7CC),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
       ),
     );
   }

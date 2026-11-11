@@ -175,7 +175,7 @@ class _PinSetupPageState extends State<PinSetupPage> {
                         color: _dangerColor.withValues(alpha: 0.55),
                       ),
                     ),
-                    icon: const AppIcon(AppIcons.lock, color: _dangerColor),
+                    icon: const AppIcon(AppIcons.delete, color: _dangerColor),
                     label: const Text('Remove PIN'),
                   )
                 : FilledButton.icon(

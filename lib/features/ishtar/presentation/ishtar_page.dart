@@ -587,7 +587,9 @@ class _IshtarPageState extends State<IshtarPage> {
                         : (_modelDownloaded
                               ? AppIcons.cloud
                               : AppIcons.arrowBigDownDash),
-                    color: useLocal ? ishtarGreen : Colors.black,
+                    color: useLocal
+                        ? ishtarGreen
+                        : (_modelDownloaded ? ishtarCloud : Colors.black),
                   ),
           ),
           IconButton(

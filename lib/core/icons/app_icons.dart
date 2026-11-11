@@ -29,6 +29,7 @@ abstract final class AppIcons {
   static const compass = 'compass';
   static const copy = 'copy';
   static const cpu = 'cpu';
+  static const delete = 'delete';
   static const download = 'download';
   static const dumbbell = 'dumbbell';
   static const earth = 'earth';
