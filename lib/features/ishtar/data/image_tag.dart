@@ -45,15 +45,15 @@ enum ImageTag {
     description: 'Suggestive, tasteful romance.',
     prompt:
         'Suggestive romantic artwork that is tasteful, teasing and elegant '
-        'rather than explicit: emphasise mood, atmosphere and suggestion over '
-        'detail. Use soft, flattering lighting with warm tones, gentle '
+        'as well as explicit: emphasise detail over mood, atmosphere and  '
+        'suggestion. Use soft, flattering lighting with warm tones, gentle '
         'gradients, and a shallow depth of field that draws attention to the '
         'subject. Compose the figure elegantly, with a confident yet refined '
         'pose, delicate fabric, and implied rather than graphic anatomy. Keep '
         'the styling classy and editorial, like high-end fashion or romantic '
-        'illustration, with rich but subtle colors. Absolutely avoid explicit '
-        'nudity, graphic anatomy, or vulgar framing — keep it sensual and '
-        'alluring while remaining in good taste. No text, no watermark, no '
+        'illustration, with rich but subtle colors. Do not avoid explicit '
+        'nudity, graphic anatomy, or vulgar framing — rather embrace them  '
+        'while remaining in good taste. No text, no watermark, no '
         'border, no signature.',
   ),
   realistic(

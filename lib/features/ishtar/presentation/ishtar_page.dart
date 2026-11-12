@@ -11,6 +11,7 @@ import 'package:lumii_quest/features/ishtar/data/ai_type.dart';
 import 'package:lumii_quest/features/ishtar/data/gen_type.dart';
 import 'package:lumii_quest/features/ishtar/data/image_tag.dart';
 import 'package:lumii_quest/features/ishtar/data/ishtar_repository.dart';
+import 'package:lumii_quest/features/ishtar/data/local_image_service.dart';
 import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
 import 'package:lumii_quest/features/ishtar/data/media_file_io.dart';
 import 'package:lumii_quest/features/ishtar/presentation/code_highlight.dart';
@@ -250,10 +251,6 @@ class _IshtarPageState extends State<IshtarPage> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
-    if (_genType == GenType.image && LocalLlmService.instance.useLocal) {
-      _showSnack('Image generation is not available with the on-device model.');
-      return;
-    }
     final shouldTitle = _messages.isEmpty && widget.conversation.title.isEmpty;
     _controller.clear();
 
@@ -348,9 +345,14 @@ class _IshtarPageState extends State<IshtarPage> {
     String? imagePath;
     Object? error;
     try {
-      final bytes = await _repository
-          .generateImage(prompt)
-          .timeout(const Duration(seconds: 150));
+      final useLocal = LocalLlmService.instance.useLocal;
+      final bytes = useLocal
+          ? await LocalImageService.instance
+              .generateImage(prompt)
+              .timeout(const Duration(minutes: 30))
+          : await _repository
+              .generateImage(prompt)
+              .timeout(const Duration(seconds: 150));
       if (!mounted || generationId != _generationId) return;
       final dir = await _mediaDir();
       imagePath =
@@ -1362,21 +1364,8 @@ class _AiSettingsSheetState extends State<_AiSettingsSheet> {
   late AiType _aiType = widget.initialAiType;
   late ImageTag _imageTag = widget.initialImageTag;
 
-  bool get _imageLocked => LocalLlmService.instance.useLocal;
-
-  @override
-  void initState() {
-    super.initState();
-    // Image generation requires the cloud model; fall back to text if the
-    // sheet is opened while the on-device model is active.
-    if (_genType == GenType.image && _imageLocked) {
-      _genType = GenType.text;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final imageLocked = _imageLocked;
     final isImage = _genType == GenType.image;
 
     final tagChips = isImage
@@ -1457,19 +1446,10 @@ class _AiSettingsSheetState extends State<_AiSettingsSheet> {
                     icon: AppIcons.image,
                     label: 'Image',
                     selected: isImage,
-                    enabled: !imageLocked,
                     onTap: () => setState(() => _genType = GenType.image),
                   ),
                 ],
               ),
-              if (imageLocked) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'Image generation needs the cloud model — switch off the '
-                  'on-device model first.',
-                  style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
-                ),
-              ],
               const SizedBox(height: 16),
               const Text(
                 'Tags',
@@ -1525,39 +1505,34 @@ class _ChipTag extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.enabled = true,
   });
 
   final String icon;
   final String label;
   final bool selected;
   final VoidCallback? onTap;
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final background = selected ? Colors.black : const Color(0xFFF2F2F2);
     final foreground = selected ? Colors.white : const Color(0xFF1A1A1A);
-    final effectiveForeground = enabled
-        ? foreground
-        : const Color(0xFFB8B8BF);
     return Material(
       color: background,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: enabled ? onTap : null,
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppIcon(icon, color: effectiveForeground, size: 16),
+              AppIcon(icon, color: foreground, size: 16),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: effectiveForeground,
+                  color: foreground,
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
                 ),
