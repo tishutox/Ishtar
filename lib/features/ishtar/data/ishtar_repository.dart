@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ai_type.dart';
+import 'gen_type.dart';
+import 'image_tag.dart';
 import 'local_llm_service.dart';
 
 /// A single message in an Ishtar (AI assistant) conversation.
@@ -131,9 +134,12 @@ class IshtarRepository {
   static const _conversationsKey = 'ishtar_conversations_v1';
   static const _legacyMessagesKey = 'ishtar_messages_v1';
   static const _aiTypeKey = 'ishtar_ai_type_v1';
+  static const _genTypeKey = 'ishtar_gen_type_v1';
+  static const _imageTagKey = 'ishtar_image_tag_v1';
   static const _model = 'glm-5.3-flash:cloud';
   static const _chatUrl = 'https://ollama.com/api/chat';
   static const _pollinationsUrl = 'https://text.pollinations.ai/';
+  static const _imageUrl = 'https://image.pollinations.ai/prompt';
   static const _apiKey = String.fromEnvironment('OLLAMA_API_KEY');
   /// Ishtar's personality: a laid-back, computer-science-nerdy buddy who's fun
   /// to hang out with. Answers in English, keeps it casual, and occasionally
@@ -164,6 +170,64 @@ class IshtarRepository {
   Future<void> saveAiType(AiType type) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_aiTypeKey, type.name);
+  }
+
+  /// Loads the generation type (text or image), defaulting to text.
+  Future<GenType> loadGenType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_genTypeKey);
+    return GenType.values.firstWhere(
+      (type) => type.name == raw,
+      orElse: () => GenType.text,
+    );
+  }
+
+  Future<void> saveGenType(GenType type) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_genTypeKey, type.name);
+  }
+
+  /// Loads the selected image style, defaulting to [ImageTag.anime].
+  Future<ImageTag> loadImageTag() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_imageTagKey);
+    return ImageTag.values.firstWhere(
+      (tag) => tag.name == raw,
+      orElse: () => ImageTag.anime,
+    );
+  }
+
+  Future<void> saveImageTag(ImageTag tag) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_imageTagKey, tag.name);
+  }
+
+  /// Generates an image from [prompt] via the Pollinations image endpoint and
+  /// returns the raw image bytes. The selected [ImageTag] style prompt is
+  /// prepended to the user's request.
+  Future<Uint8List> generateImage(String prompt) async {
+    final tag = await loadImageTag();
+    final fullPrompt = '${tag.prompt}\n\n$prompt';
+    final uri = Uri.parse(
+      '$_imageUrl/${Uri.encodeComponent(fullPrompt)}'
+      '?width=1024&height=1024&model=flux&nologo=true',
+    );
+    final client = http.Client();
+    try {
+      final response = await client
+          .get(uri)
+          .timeout(const Duration(seconds: 120));
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Image generation failed (HTTP ${response.statusCode}).',
+        );
+      }
+      return response.bodyBytes;
+    } on TimeoutException {
+      throw Exception('Image generation timed out. Please try again.');
+    } finally {
+      client.close();
+    }
   }
 
   /// Cancels any in-flight cloud reply request. On-device (local) generation

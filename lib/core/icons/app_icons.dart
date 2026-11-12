@@ -113,6 +113,18 @@ abstract final class AppIcons {
   static const videoOff = 'video-off';
   static const volume2 = 'volume-2';
   static const volumeOff = 'volume-off';
+  static const box = 'box';
+  static const brainCircuit = 'brain-circuit';
+  static const broomSparkles = 'broom-sparkles';
+  static const feather = 'feather';
+  static const flower = 'flower';
+  static const pacMan = 'pac-man';
+  static const palette = 'palette';
+  static const pepperChilli = 'pepper-chilli';
+  static const sparkles = 'sparkles';
+  static const square = 'square';
+  static const squareUserRound = 'square-user-round';
+  static const torus = 'torus';
   static const x = 'x';
 }
 

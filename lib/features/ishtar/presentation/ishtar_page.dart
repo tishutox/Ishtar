@@ -8,6 +8,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
 import 'package:lumii_quest/features/ishtar/data/ai_type.dart';
+import 'package:lumii_quest/features/ishtar/data/gen_type.dart';
+import 'package:lumii_quest/features/ishtar/data/image_tag.dart';
 import 'package:lumii_quest/features/ishtar/data/ishtar_repository.dart';
 import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
 import 'package:lumii_quest/features/ishtar/data/media_file_io.dart';
@@ -55,6 +57,8 @@ class _IshtarPageState extends State<IshtarPage> {
   final _inputAreaKey = GlobalKey();
   double _inputAreaHeight = 0;
   AiType _aiType = AiType.casual;
+  GenType _genType = GenType.text;
+  ImageTag _imageTag = ImageTag.anime;
 
   bool get _supportsMedia =>
       !kIsWeb &&
@@ -68,6 +72,8 @@ class _IshtarPageState extends State<IshtarPage> {
     _controller.addListener(_handleTextChanged);
     unawaited(_checkCrashLog());
     unawaited(_loadAiType());
+    unawaited(_loadGenType());
+    unawaited(_loadImageTag());
     unawaited(_loadModelDownloaded());
     // When a chat is opened (or switched to), start at the latest message
     // instead of the top of the history.
@@ -158,22 +164,42 @@ class _IshtarPageState extends State<IshtarPage> {
     if (mounted) setState(() => _aiType = type);
   }
 
+  Future<void> _loadGenType() async {
+    final type = await _repository.loadGenType();
+    if (mounted) setState(() => _genType = type);
+  }
+
+  Future<void> _loadImageTag() async {
+    final tag = await _repository.loadImageTag();
+    if (mounted) setState(() => _imageTag = tag);
+  }
+
   Future<void> _loadModelDownloaded() async {
     final downloaded = await LocalLlmService.instance.isDownloaded();
     if (mounted) setState(() => _modelDownloaded = downloaded);
   }
 
   Future<void> _openAiSettings() async {
-    final selected = await showModalBottomSheet<AiType>(
+    final result = await showModalBottomSheet<_AiSettingsResult>(
       context: context,
       backgroundColor: Colors.white,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => _AiTypeSheet(initial: _aiType),
+      builder: (context) => _AiSettingsSheet(
+        initialGenType: _genType,
+        initialAiType: _aiType,
+        initialImageTag: _imageTag,
+      ),
     );
-    if (selected == null || !mounted || selected == _aiType) return;
-    setState(() => _aiType = selected);
-    await _repository.saveAiType(selected);
+    if (result == null || !mounted) return;
+    setState(() {
+      _genType = result.genType;
+      _aiType = result.aiType;
+      _imageTag = result.imageTag;
+    });
+    await _repository.saveGenType(result.genType);
+    await _repository.saveAiType(result.aiType);
+    await _repository.saveImageTag(result.imageTag);
   }
 
   Future<void> _toggleLocalModel() async {
@@ -217,6 +243,10 @@ class _IshtarPageState extends State<IshtarPage> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
+    if (_genType == GenType.image && LocalLlmService.instance.useLocal) {
+      _showSnack('Image generation is not available with the on-device model.');
+      return;
+    }
     final shouldTitle = _messages.isEmpty && widget.conversation.title.isEmpty;
     _controller.clear();
 
@@ -236,6 +266,11 @@ class _IshtarPageState extends State<IshtarPage> {
     // reply is slow or fails.
     _persist();
     _scrollToBottom();
+
+    if (_genType == GenType.image) {
+      await _generateImageReply(text, generationId, shouldTitle);
+      return;
+    }
 
     String? reply;
     Object? error;
@@ -294,6 +329,72 @@ class _IshtarPageState extends State<IshtarPage> {
     final derivedTitle = shouldTitle
         ? _repository.titleFromMessage(text)
         : '';
+    _persist(title: derivedTitle.isEmpty ? null : derivedTitle);
+    setState(() => _sending = false);
+  }
+
+  Future<void> _generateImageReply(
+    String prompt,
+    int generationId,
+    bool shouldTitle,
+  ) async {
+    String? imagePath;
+    Object? error;
+    try {
+      final bytes = await _repository
+          .generateImage(prompt)
+          .timeout(const Duration(seconds: 150));
+      if (!mounted || generationId != _generationId) return;
+      final dir = await _mediaDir();
+      imagePath =
+          '$dir/ishtar_img_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      await writeMediaFile(imagePath, bytes);
+    } catch (e) {
+      error = e;
+    }
+
+    if (!mounted || generationId != _generationId) return;
+    setState(() => _generating = false);
+
+    if (_abortRequested) {
+      _persist();
+      setState(() => _sending = false);
+      _scrollToBottom();
+      return;
+    }
+
+    if (error != null) {
+      setState(() {
+        _messages = [
+          ..._messages,
+          IshtarMessage(
+            role: 'assistant',
+            content: 'Sorry, something went wrong: $error',
+            sentAt: DateTime.now(),
+          ),
+        ];
+      });
+      _persist();
+      setState(() => _sending = false);
+      _scrollToBottom();
+      return;
+    }
+
+    setState(() {
+      _messages = [
+        ..._messages,
+        IshtarMessage(
+          role: 'assistant',
+          content: '',
+          sentAt: DateTime.now(),
+          kind: 'image',
+          mediaPath: imagePath,
+        ),
+      ];
+    });
+    _scrollToBottom();
+
+    final derivedTitle = shouldTitle ? _repository.titleFromMessage(prompt) : '';
     _persist(title: derivedTitle.isEmpty ? null : derivedTitle);
     setState(() => _sending = false);
   }
@@ -1197,20 +1298,87 @@ String _imageExtension(String fileName) {
   };
 }
 
-class _AiTypeSheet extends StatefulWidget {
-  const _AiTypeSheet({required this.initial});
+class _AiSettingsResult {
+  const _AiSettingsResult({
+    required this.genType,
+    required this.aiType,
+    required this.imageTag,
+  });
 
-  final AiType initial;
-
-  @override
-  State<_AiTypeSheet> createState() => _AiTypeSheetState();
+  final GenType genType;
+  final AiType aiType;
+  final ImageTag imageTag;
 }
 
-class _AiTypeSheetState extends State<_AiTypeSheet> {
-  late AiType _selected = widget.initial;
+class _AiSettingsSheet extends StatefulWidget {
+  const _AiSettingsSheet({
+    required this.initialGenType,
+    required this.initialAiType,
+    required this.initialImageTag,
+  });
+
+  final GenType initialGenType;
+  final AiType initialAiType;
+  final ImageTag initialImageTag;
+
+  @override
+  State<_AiSettingsSheet> createState() => _AiSettingsSheetState();
+}
+
+class _AiSettingsSheetState extends State<_AiSettingsSheet> {
+  late GenType _genType = widget.initialGenType;
+  late AiType _aiType = widget.initialAiType;
+  late ImageTag _imageTag = widget.initialImageTag;
+
+  bool get _imageLocked => LocalLlmService.instance.useLocal;
+
+  @override
+  void initState() {
+    super.initState();
+    // Image generation requires the cloud model; fall back to text if the
+    // sheet is opened while the on-device model is active.
+    if (_genType == GenType.image && _imageLocked) {
+      _genType = GenType.text;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final imageLocked = _imageLocked;
+    final isImage = _genType == GenType.image;
+
+    final tagChips = isImage
+        ? <Widget>[
+            for (final tag in ImageTag.values.toList()
+              ..sort(
+                (a, b) => a.label
+                    .toLowerCase()
+                    .compareTo(b.label.toLowerCase()),
+              ))
+              _ChipTag(
+                icon: tag.icon,
+                label: tag.label,
+                selected: tag == _imageTag,
+                onTap: () => setState(() => _imageTag = tag),
+              ),
+          ]
+        : <Widget>[
+            for (final type in AiType.values.toList()
+              ..sort(
+                (a, b) => a.label
+                    .toLowerCase()
+                    .compareTo(b.label.toLowerCase()),
+              ))
+              _ChipTag(
+                icon: type.icon,
+                label: type.label,
+                selected: type == _aiType,
+                onTap: () => setState(() => _aiType = type),
+              ),
+          ];
+
+    final description = isImage ? _imageTag.description : _aiType.description;
+
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -1235,7 +1403,7 @@ class _AiTypeSheetState extends State<_AiTypeSheet> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Type',
+                'Types',
                 style: TextStyle(
                   color: Color(0xFF8E8E93),
                   fontSize: 13,
@@ -1247,29 +1415,60 @@ class _AiTypeSheetState extends State<_AiTypeSheet> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  for (final type in AiType.values.toList()
-                    ..sort(
-                      (a, b) => a.label
-                          .toLowerCase()
-                          .compareTo(b.label.toLowerCase()),
-                    ))
-                    _TypeTag(
-                      type: type,
-                      selected: type == _selected,
-                      onTap: () => setState(() => _selected = type),
-                    ),
+                  _ChipTag(
+                    icon: AppIcons.messageSquareText,
+                    label: 'Text',
+                    selected: !isImage,
+                    onTap: () => setState(() => _genType = GenType.text),
+                  ),
+                  _ChipTag(
+                    icon: AppIcons.image,
+                    label: 'Image',
+                    selected: isImage,
+                    enabled: !imageLocked,
+                    onTap: () => setState(() => _genType = GenType.image),
+                  ),
                 ],
+              ),
+              if (imageLocked) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Image generation needs the cloud model — switch off the '
+                  'on-device model first.',
+                  style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
+                ),
+              ],
+              const SizedBox(height: 16),
+              const Text(
+                'Tags',
+                style: TextStyle(
+                  color: Color(0xFF8E8E93),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: tagChips,
               ),
               const SizedBox(height: 16),
               Text(
-                _selected.description,
+                description,
                 style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 13),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(_selected),
+                  onPressed: () => Navigator.of(context).pop(
+                    _AiSettingsResult(
+                      genType: _genType,
+                      aiType: _aiType,
+                      imageTag: _imageTag,
+                    ),
+                  ),
                   style: FilledButton.styleFrom(
                     shape: const StadiumBorder(),
                     minimumSize: const Size(0, 48),
@@ -1288,38 +1487,45 @@ class _AiTypeSheetState extends State<_AiTypeSheet> {
   }
 }
 
-class _TypeTag extends StatelessWidget {
-  const _TypeTag({
-    required this.type,
+class _ChipTag extends StatelessWidget {
+  const _ChipTag({
+    required this.icon,
+    required this.label,
     required this.selected,
     required this.onTap,
+    this.enabled = true,
   });
 
-  final AiType type;
+  final String icon;
+  final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final background = selected ? Colors.black : const Color(0xFFF2F2F2);
     final foreground = selected ? Colors.white : const Color(0xFF1A1A1A);
+    final effectiveForeground = enabled
+        ? foreground
+        : const Color(0xFFB8B8BF);
     return Material(
       color: background,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppIcon(type.icon, color: foreground, size: 16),
+              AppIcon(icon, color: effectiveForeground, size: 16),
               const SizedBox(width: 8),
               Text(
-                type.label,
+                label,
                 style: TextStyle(
-                  color: foreground,
+                  color: effectiveForeground,
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
                 ),
