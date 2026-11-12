@@ -25,10 +25,16 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
+    // onAuthStateChange replays the last event on subscribe, so a signed-out
+    // visitor would receive a stale `signedOut` and immediately navigate away.
+    // Only react when this page actually opened while signed in.
+    final signedInAtOpen = Supabase.instance.client.auth.currentUser != null;
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       state,
     ) {
-      if (mounted && state.event == AuthChangeEvent.signedOut) {
+      if (mounted &&
+          state.event == AuthChangeEvent.signedOut &&
+          signedInAtOpen) {
         context.go('/');
       }
     });

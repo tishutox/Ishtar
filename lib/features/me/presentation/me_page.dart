@@ -338,8 +338,9 @@ class _MePageState extends State<MePage> {
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
+    final Widget child;
     if (user != null) {
-      return _SignedInProfile(
+      child = _SignedInProfile(
         user: user,
         onEdit: () async {
           await context.push<bool>('/edit-profile');
@@ -350,13 +351,16 @@ class _MePageState extends State<MePage> {
         onDeleteAccount: _isSubmitting ? null : _deleteAccount,
         onSignOut: _signOut,
       );
+    } else if (_showLanding) {
+      child = _buildLanding(context);
+    } else {
+      child = _buildWizard(context);
     }
 
-    if (_showLanding) {
-      return _buildLanding(context);
-    }
-
-    return _buildWizard(context);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: child,
+    );
   }
 
   Widget _buildLanding(BuildContext context) {
