@@ -41,6 +41,8 @@
 	<string>Ishtar uses your camera for video calls.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ishtar uses your microphone for voice and video calls.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Ishtar uses speech recognition to turn your voice into a message.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

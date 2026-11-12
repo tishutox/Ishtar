@@ -13,7 +13,7 @@ import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
 import 'package:lumii_quest/features/ishtar/data/media_file_io.dart';
 import 'package:lumii_quest/features/ishtar/presentation/code_highlight.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 const Color ishtarGreen = Color(0xFF34C759);
 const Color ishtarCloud = Color(0xFFFFA000);
@@ -42,7 +42,7 @@ class _IshtarPageState extends State<IshtarPage> {
   final _repository = IshtarRepository();
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final _recorder = AudioRecorder();
+  final _speech = SpeechToText();
   late List<IshtarMessage> _messages;
   bool _sending = false;
   bool _generating = false;
@@ -50,11 +50,8 @@ class _IshtarPageState extends State<IshtarPage> {
   int _generationId = 0;
   bool _downloadingModel = false;
   bool _modelDownloaded = false;
-  bool _isRecording = false;
+  bool _isListening = false;
   bool _showAttachMenu = false;
-  final List<double> _amplitudes = [];
-  StreamSubscription<Amplitude>? _amplitudeSub;
-  DateTime? _recordingStartedAt;
   final _inputAreaKey = GlobalKey();
   double _inputAreaHeight = 0;
   AiType _aiType = AiType.casual;
@@ -82,8 +79,7 @@ class _IshtarPageState extends State<IshtarPage> {
     _controller.removeListener(_handleTextChanged);
     _controller.dispose();
     _scrollController.dispose();
-    _amplitudeSub?.cancel();
-    unawaited(_recorder.dispose());
+    if (_speech.isAvailable) unawaited(_speech.cancel());
     super.dispose();
   }
 
@@ -322,7 +318,7 @@ class _IshtarPageState extends State<IshtarPage> {
   }
 
   Future<void> _sendImages() async {
-    if (_sending || _isRecording) return;
+    if (_sending || _isListening) return;
     final images = await ImagePicker().pickMultiImage(
       maxWidth: 1600,
       imageQuality: 85,
@@ -332,7 +328,7 @@ class _IshtarPageState extends State<IshtarPage> {
   }
 
   Future<void> _takePhoto() async {
-    if (_sending || _isRecording) return;
+    if (_sending || _isListening) return;
     final image = await ImagePicker().pickImage(
       source: ImageSource.camera,
       maxWidth: 1600,
@@ -378,7 +374,7 @@ class _IshtarPageState extends State<IshtarPage> {
   }
 
   Future<void> _pickFile() async {
-    if (_sending || _isRecording) return;
+    if (_sending || _isListening) return;
     final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
@@ -426,114 +422,69 @@ class _IshtarPageState extends State<IshtarPage> {
     setState(() => _showAttachMenu = !_showAttachMenu);
   }
 
-  Future<void> _toggleRecording() async {
-    if (_isRecording) {
-      await _cancelRecording();
+  Future<void> _toggleDictation() async {
+    if (_isListening) {
+      await _stopDictation();
     } else {
-      await _startRecording();
+      await _startDictation();
     }
   }
 
-  Future<void> _startRecording() async {
+  Future<void> _startDictation() async {
     if (_sending) return;
-    final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) {
-      _showSnack('Microphone permission is required to record.');
-      return;
+    if (!_speech.isAvailable) {
+      final available = await _speech.initialize();
+      if (!available) {
+        _showSnack('Speech recognition is not available on this device.');
+        return;
+      }
     }
-    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
-    final encoder = isAndroid ? AudioEncoder.aacLc : AudioEncoder.wav;
-    final extension = isAndroid ? 'm4a' : 'wav';
-    final dir = await getTemporaryDirectory();
-    final path =
-        '${dir.path}/lumii_voice_${DateTime.now().millisecondsSinceEpoch}.$extension';
-    try {
-      await _recorder.start(RecordConfig(encoder: encoder), path: path);
-    } catch (error) {
-      _showSnack('Recording could not start: $error');
-      return;
-    }
-    _amplitudes.clear();
-    _amplitudeSub?.cancel();
-    _amplitudeSub = _recorder
-        .onAmplitudeChanged(const Duration(milliseconds: 120))
-        .listen((amplitude) {
-          if (mounted) {
-            setState(() => _amplitudes.add(amplitude.current));
-          }
-        });
     if (mounted) {
       setState(() {
-        _isRecording = true;
-        _recordingStartedAt = DateTime.now();
+        _isListening = true;
         _showAttachMenu = false;
       });
     }
-  }
-
-  Future<void> _cancelRecording() async {
-    _amplitudeSub?.cancel();
-    _amplitudeSub = null;
-    await _recorder.cancel();
-    if (mounted) {
-      setState(() {
-        _isRecording = false;
-        _amplitudes.clear();
-        _recordingStartedAt = null;
-      });
-    }
-  }
-
-  Future<void> _finishRecording() async {
-    _amplitudeSub?.cancel();
-    _amplitudeSub = null;
-    final path = await _recorder.stop();
-    if (!mounted) return;
-    final duration = _recordingStartedAt == null
-        ? 0.0
-        : DateTime.now().difference(_recordingStartedAt!).inMilliseconds /
-              1000.0;
-    setState(() {
-      _isRecording = false;
-      _amplitudes.clear();
-      _recordingStartedAt = null;
-    });
-    if (path == null) return;
-    setState(() => _sending = true);
     try {
-      final dir = await _mediaDir();
-      final extension = _audioExtension(path);
-      final dest =
-          '$dir/ishtar_${DateTime.now().microsecondsSinceEpoch}.$extension';
-      final bytes = await readMediaFile(path);
-      await writeMediaFile(dest, bytes);
-      setState(() {
-        _messages = [
-          ..._messages,
-          IshtarMessage(
-            role: 'user',
-            content: '',
-            sentAt: DateTime.now(),
-            kind: 'audio',
-            mediaPath: dest,
-            mediaDuration: duration,
-          ),
-        ];
-      });
-      _persist();
-      _scrollToBottom();
-      await _acknowledgeMedia('audio');
+      await _speech.listen(
+        onResult: (result) {
+          if (!result.finalResult) return;
+          _insertRecognizedText(result.recognizedWords);
+          if (mounted) setState(() => _isListening = false);
+        },
+        listenOptions: SpeechListenOptions(
+          partialResults: false,
+          listenMode: ListenMode.dictation,
+        ),
+      );
     } catch (error) {
-      _showSnack('Voice message could not be sent: $error');
-    } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) {
+        setState(() => _isListening = false);
+        _showSnack('Speech recognition failed: $error');
+      }
     }
+  }
+
+  Future<void> _stopDictation() async {
+    await _speech.stop();
+    if (mounted) setState(() => _isListening = false);
+  }
+
+  void _insertRecognizedText(String text) {
+    final words = text.trim();
+    if (words.isEmpty) return;
+    final value = _controller.value;
+    final selection = value.selection;
+    final start = selection.isValid ? selection.start : value.text.length;
+    final end = selection.isValid ? selection.end : value.text.length;
+    _controller.value = TextEditingValue(
+      text: value.text.replaceRange(start, end, words),
+      selection: TextSelection.collapsed(offset: start + words.length),
+    );
   }
 
   Future<void> _acknowledgeMedia(String kind) async {
     final reply = switch (kind) {
-      'audio' =>
-        "I can only read text, so I can't hear voice messages. Send me a text and I'll answer.",
       'file' =>
         "I can only read text, so I can't open files. Tell me what it says.",
       _ => "I can only read text, so I can't see images. Tell me what it says.",
@@ -643,12 +594,8 @@ class _IshtarPageState extends State<IshtarPage> {
 
   Widget _buildInputBar() {
     if (_supportsMedia) {
-      if (_isRecording) {
-        return _RecordingInputBar(
-          amplitudes: _amplitudes,
-          onCancel: _cancelRecording,
-          onFinish: _finishRecording,
-        );
+      if (_isListening) {
+        return _ListeningInputBar(onStop: _stopDictation);
       }
       return _IshtarMediaInputBar(
         controller: _controller,
@@ -658,7 +605,7 @@ class _IshtarPageState extends State<IshtarPage> {
         onSend: _send,
         onCancel: _cancelGeneration,
         onToggleAttachMenu: _toggleAttachMenu,
-        onToggleRecording: _toggleRecording,
+        onToggleDictation: _toggleDictation,
       );
     }
     return _IshtarTextInputBar(
@@ -699,7 +646,7 @@ class _IshtarMediaInputBar extends StatelessWidget {
     required this.onSend,
     required this.onCancel,
     required this.onToggleAttachMenu,
-    required this.onToggleRecording,
+    required this.onToggleDictation,
   });
 
   final TextEditingController controller;
@@ -709,7 +656,7 @@ class _IshtarMediaInputBar extends StatelessWidget {
   final Future<void> Function() onSend;
   final VoidCallback onCancel;
   final VoidCallback onToggleAttachMenu;
-  final Future<void> Function() onToggleRecording;
+  final Future<void> Function() onToggleDictation;
 
   @override
   Widget build(BuildContext context) {
@@ -771,8 +718,8 @@ class _IshtarMediaInputBar extends StatelessWidget {
               )
             else ...[
               IconButton(
-                tooltip: 'Voice message',
-                onPressed: isSending ? null : onToggleRecording,
+                tooltip: 'Dictate message',
+                onPressed: isSending ? null : onToggleDictation,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 icon: AppIcon(AppIcons.mic, color: primary),
@@ -923,21 +870,14 @@ class _AttachOption extends StatelessWidget {
   }
 }
 
-class _RecordingInputBar extends StatelessWidget {
-  const _RecordingInputBar({
-    required this.amplitudes,
-    required this.onCancel,
-    required this.onFinish,
-  });
+class _ListeningInputBar extends StatelessWidget {
+  const _ListeningInputBar({required this.onStop});
 
-  final List<double> amplitudes;
-  final VoidCallback onCancel;
-  final VoidCallback onFinish;
+  final VoidCallback onStop;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    final error = Theme.of(context).colorScheme.error;
     final surface = Theme.of(context).colorScheme.surfaceContainerHighest;
 
     return Padding(
@@ -950,22 +890,23 @@ class _RecordingInputBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _CircleIconButton(
-              tooltip: 'Cancel recording',
-              icon: AppIcons.trash,
-              backgroundColor: error.withValues(alpha: 0.16),
-              iconColor: error,
-              onPressed: onCancel,
+            const SizedBox(width: 12),
+            AppIcon(AppIcons.mic, color: primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Listening…',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: primary),
+              ),
             ),
-            const SizedBox(width: 8),
-            Expanded(child: _RecordingWaveform(amplitudes: amplitudes)),
-            const SizedBox(width: 8),
             _CircleIconButton(
-              tooltip: 'Send voice message',
-              icon: AppIcons.sendHorizontal,
+              tooltip: 'Stop dictation',
+              icon: AppIcons.micOff,
               backgroundColor: primary,
               iconColor: Colors.white,
-              onPressed: onFinish,
+              onPressed: onStop,
             ),
           ],
         ),
@@ -1003,46 +944,6 @@ class _CircleIconButton extends StatelessWidget {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
           icon: AppIcon(icon, color: iconColor, size: 24),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecordingWaveform extends StatelessWidget {
-  const _RecordingWaveform({required this.amplitudes});
-
-  final List<double> amplitudes;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    final samples = amplitudes.isEmpty
-        ? List<double>.filled(28, 0.25)
-        : amplitudes.length > 40
-        ? amplitudes.sublist(amplitudes.length - 40)
-        : amplitudes;
-
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      alignment: Alignment.centerLeft,
-      child: ClipRect(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < samples.length; i++) ...[
-              if (i > 0) const SizedBox(width: 3),
-              Container(
-                width: 3,
-                height: 6 + _normalizeAmplitude(samples[i]) * 36,
-                decoration: BoxDecoration(
-                  color: primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
-          ],
         ),
       ),
     );
@@ -1296,15 +1197,6 @@ String _imageExtension(String fileName) {
     'gif' => 'gif',
     _ => 'jpg',
   };
-}
-
-String _audioExtension(String path) {
-  final extension = path.split('.').last.toLowerCase();
-  return extension.isEmpty ? 'm4a' : extension;
-}
-
-double _normalizeAmplitude(double db) {
-  return ((db + 60) / 60).clamp(0.06, 1.0);
 }
 
 class _AiTypeSheet extends StatefulWidget {
