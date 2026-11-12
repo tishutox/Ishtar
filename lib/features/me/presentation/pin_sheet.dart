@@ -132,7 +132,7 @@ class _PinSheetState extends State<PinSheet> {
             else if (_enabled)
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
+                child: OutlinedButton(
                   onPressed: _removePin,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _dangerColor,
@@ -142,8 +142,7 @@ class _PinSheetState extends State<PinSheet> {
                     shape: const StadiumBorder(),
                     minimumSize: const Size(0, 48),
                   ),
-                  icon: const AppIcon(AppIcons.delete, color: _dangerColor),
-                  label: const Text('Remove PIN'),
+                  child: const Text('Remove PIN'),
                 ),
               )
             else

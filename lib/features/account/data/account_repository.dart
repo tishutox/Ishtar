@@ -42,6 +42,18 @@ class AccountRepository {
     );
   }
 
+  Future<void> updateFirstName(String firstName) async {
+    await _client.auth.updateUser(
+      UserAttributes(data: {'first_name': firstName}),
+    );
+  }
+
+  Future<void> updateLastName(String lastName) async {
+    await _client.auth.updateUser(
+      UserAttributes(data: {'last_name': lastName}),
+    );
+  }
+
   Future<void> updateEmail(String email) async {
     await _client.auth.updateUser(UserAttributes(email: email));
   }

@@ -613,6 +613,27 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
   }
 
   Widget _buildAvatar() {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      return InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => context.push('/auth'),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black,
+          ),
+          child: const Center(
+            child: AppIcon(
+              AppIcons.circleUserRound,
+              size: 22,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
     final avatarUrl = _avatarUrl;
     return InkWell(
       borderRadius: BorderRadius.circular(999),

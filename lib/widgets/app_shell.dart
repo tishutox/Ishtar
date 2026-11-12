@@ -3,12 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lumii_quest/features/ishtar/presentation/ishtar_dashboard.dart';
 import 'package:lumii_quest/features/me/data/pin_service.dart';
-import 'package:lumii_quest/features/me/presentation/me_page.dart';
 import 'package:lumii_quest/features/me/presentation/pin_lock_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Root screen: shows the sign-in wizard until a user is authenticated, then
-/// the Ishtar AI chat — gated by the optional login PIN.
+/// Root screen: opens directly into the Ishtar AI chat. Signed-in users are
+/// gated by the optional login PIN; signed-out users can chat immediately.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -55,7 +54,7 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     if (Supabase.instance.client.auth.currentUser == null) {
-      return const MePage();
+      return const IshtarDashboard();
     }
     if (!_pinChecked) {
       return const Scaffold(

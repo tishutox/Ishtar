@@ -181,11 +181,16 @@ class _MePageState extends State<MePage> {
             ),
           ),
         );
+        context.go('/');
       } else {
         await auth.signInWithPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+        if (!mounted) {
+          return;
+        }
+        context.go('/');
       }
     } on AuthException catch (error) {
       if (mounted) {
@@ -356,51 +361,66 @@ class _MePageState extends State<MePage> {
 
   Widget _buildLanding(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AppIcon(AppIcons.heart, size: 64, color: primary),
-              const SizedBox(height: 16),
-              Text(
-                'Ishtar',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: primary,
-                  fontWeight: FontWeight.w800,
-                ),
+    return Stack(
+      children: [
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppIcon(AppIcons.heart, size: 64, color: primary),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Ishtar',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Connect with friends and communities.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  FilledButton.icon(
+                    onPressed: () => _start(_AuthMode.signUp),
+                    icon: const AppIcon(AppIcons.userPlus),
+                    label: const Text('Sign Up'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => _start(_AuthMode.signIn),
+                    icon: const AppIcon(AppIcons.logIn),
+                    label: const Text('Sign In'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Connect with friends and communities.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 40),
-              FilledButton.icon(
-                onPressed: () => _start(_AuthMode.signUp),
-                icon: const AppIcon(AppIcons.userPlus),
-                label: const Text('Sign Up'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => _start(_AuthMode.signIn),
-                icon: const AppIcon(AppIcons.logIn),
-                label: const Text('Sign In'),
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+        SafeArea(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: IconButton(
+              tooltip: 'Back',
+              onPressed: () =>
+                  context.canPop() ? context.pop() : context.go('/'),
+              icon: const AppIcon(AppIcons.chevronLeft),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -103,11 +103,12 @@ class _SettingsPageState extends State<SettingsPage> {
             child: SettingsSection(
               title: 'Account',
               children: [
-                _SettingsLinkTile(
-                  label: 'Account',
-                  icon: AppIcons.circleUserRound,
-                  onTap: () => context.push('/account'),
-                ),
+                if (user != null)
+                  _SettingsLinkTile(
+                    label: 'Account',
+                    icon: AppIcons.circleUserRound,
+                    onTap: () => context.push('/account'),
+                  ),
                 _SettingsLinkTile(
                   label: 'Data Privacy & Safety',
                   icon: AppIcons.fingerprintPattern,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lumii_quest/core/icons/app_icons.dart';
 
 /// A self-contained 4-digit PIN entry: four status dots plus a numeric
 /// keypad. Calls [onCompleted] once four digits have been entered, then
@@ -47,10 +48,7 @@ class _PinPadState extends State<PinPad> {
   Widget _backspaceKey() {
     return _KeypadButton(
       onTap: _backspace,
-      child: const Text(
-        '⌫',
-        style: TextStyle(fontSize: 22, color: Color(0xFF1A1A1A)),
-      ),
+      child: const AppIcon(AppIcons.delete, size: 24, color: Colors.black),
     );
   }
 

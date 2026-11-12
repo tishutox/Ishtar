@@ -55,6 +55,18 @@ class _AccountPageState extends State<AccountPage> {
         (raw is String && raw.isNotEmpty ? raw : '');
   }
 
+  String get _firstName {
+    final raw = Supabase.instance.client.auth.currentUser
+        ?.userMetadata?['first_name'];
+    return raw is String && raw.isNotEmpty ? raw : '';
+  }
+
+  String get _lastName {
+    final raw = Supabase.instance.client.auth.currentUser
+        ?.userMetadata?['last_name'];
+    return raw is String && raw.isNotEmpty ? raw : '';
+  }
+
   String get _email =>
       Supabase.instance.client.auth.currentUser?.email ?? '';
 
@@ -116,6 +128,42 @@ class _AccountPageState extends State<AccountPage> {
       await _load();
     } catch (error) {
       _showSnackBar('Display name could not be updated: $error');
+    }
+  }
+
+  Future<void> _editFirstName() async {
+    final result = await _promptForText(
+      title: 'First name',
+      label: 'First name',
+      initialValue: _firstName,
+      textCapitalization: TextCapitalization.words,
+      validator: _nameValidator,
+    );
+    if (result == null || result == _firstName || !mounted) return;
+    try {
+      await _repository.updateFirstName(result);
+      _showSnackBar('First name updated.');
+      await _load();
+    } catch (error) {
+      _showSnackBar('First name could not be updated: $error');
+    }
+  }
+
+  Future<void> _editLastName() async {
+    final result = await _promptForText(
+      title: 'Last name',
+      label: 'Last name',
+      initialValue: _lastName,
+      textCapitalization: TextCapitalization.words,
+      validator: _nameValidator,
+    );
+    if (result == null || result == _lastName || !mounted) return;
+    try {
+      await _repository.updateLastName(result);
+      _showSnackBar('Last name updated.');
+      await _load();
+    } catch (error) {
+      _showSnackBar('Last name could not be updated: $error');
     }
   }
 
@@ -240,6 +288,16 @@ class _AccountPageState extends State<AccountPage> {
               title: 'Account Information',
               dividerIndent: 16,
               children: [
+                _AccountTile(
+                  label: 'First name',
+                  value: _firstName,
+                  onTap: _editFirstName,
+                ),
+                _AccountTile(
+                  label: 'Last name',
+                  value: _lastName,
+                  onTap: _editLastName,
+                ),
                 _AccountTile(
                   label: 'Username',
                   value: _username,
@@ -655,6 +713,17 @@ class _BirthdaySheetState extends State<_BirthdaySheet> {
       ),
     );
   }
+}
+
+String? _nameValidator(String? value) {
+  final name = value?.trim() ?? '';
+  if (name.isEmpty) {
+    return 'This field is required.';
+  }
+  if (name.length > 30) {
+    return 'Must be 30 characters or fewer.';
+  }
+  return null;
 }
 
 String? _usernameValidator(String? value) {
