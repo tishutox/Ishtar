@@ -114,10 +114,8 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
           borderRadius: BorderRadius.circular(12),
         ),
         tileColor: selected ? const Color(0xFFE4E4E8) : Colors.transparent,
-        title: Text(
+        title: _AsciiEllipsisText(
           conversation.title.isEmpty ? 'New chat' : conversation.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: Color(0xFF1A1A1A),
             fontWeight: FontWeight.w600,
@@ -724,4 +722,52 @@ class _RenameDialogState extends State<_RenameDialog> {
       ],
     );
   }
+}
+
+class _AsciiEllipsisText extends StatelessWidget {
+  const _AsciiEllipsisText(this.data, {required this.style});
+
+  final String data;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final defaultStyle = DefaultTextStyle.of(context);
+    final effectiveStyle = defaultStyle.style.merge(style);
+    final textDirection = Directionality.of(context);
+    final textScaler = MediaQuery.textScalerOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: data, style: effectiveStyle),
+          maxLines: 1,
+          textDirection: textDirection,
+          textScaler: textScaler,
+          textHeightBehavior: defaultStyle.textHeightBehavior,
+          ellipsis: '...',
+        )..layout(maxWidth: constraints.maxWidth);
+        return Semantics(
+          label: data,
+          textDirection: textDirection,
+          child: CustomPaint(
+            size: Size(constraints.maxWidth, painter.height),
+            painter: _TextPainterPainter(painter),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TextPainterPainter extends CustomPainter {
+  _TextPainterPainter(this.painter);
+
+  final TextPainter painter;
+
+  @override
+  void paint(Canvas canvas, Size size) => painter.paint(canvas, Offset.zero);
+
+  @override
+  bool shouldRepaint(_TextPainterPainter oldDelegate) =>
+      oldDelegate.painter != painter;
 }

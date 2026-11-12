@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
 import 'package:lumii_quest/core/responsive/content_layout.dart';
 import 'package:lumii_quest/features/account/data/account_repository.dart';
+import 'package:lumii_quest/features/me/presentation/pin_sheet.dart';
 import 'package:lumii_quest/features/profile/data/profile_repository.dart';
 import 'package:lumii_quest/features/profile/domain/user_profile.dart';
 import 'package:lumii_quest/widgets/settings_section.dart';
@@ -206,6 +207,16 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
+  Future<void> _openPinSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const PinSheet(),
+    );
+  }
+
   Future<void> _changePassword() async {
     final newPassword = await showModalBottomSheet<String>(
       context: context,
@@ -317,6 +328,10 @@ class _AccountPageState extends State<AccountPage> {
                   label: 'Birthday',
                   value: _birthdayDisplay,
                   onTap: _editBirthday,
+                ),
+                _AccountTile(
+                  label: 'Log-In Pin',
+                  onTap: _openPinSheet,
                 ),
               ],
             ),

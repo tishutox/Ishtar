@@ -891,11 +891,9 @@ class _ListeningInputBar extends StatelessWidget {
         child: Row(
           children: [
             const SizedBox(width: 12),
-            AppIcon(AppIcons.mic, color: primary),
-            const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Listening…',
+                'Listening...',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: primary),

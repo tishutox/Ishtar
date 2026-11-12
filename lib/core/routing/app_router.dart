@@ -7,6 +7,7 @@ import 'package:lumii_quest/features/me/presentation/own_profile_page.dart';
 import 'package:lumii_quest/features/me/presentation/privacy_page.dart';
 import 'package:lumii_quest/features/me/presentation/privacy_policy_page.dart';
 import 'package:lumii_quest/features/me/presentation/settings_page.dart';
+import 'package:lumii_quest/features/me/presentation/terms_page.dart';
 import 'package:lumii_quest/features/profile/presentation/edit_profile_page.dart';
 import 'package:lumii_quest/features/profile/presentation/public_profile_page.dart';
 import 'package:lumii_quest/widgets/app_shell.dart';
@@ -22,6 +23,7 @@ final appRouter = GoRouter(
       path: '/privacy-policy',
       builder: (_, _) => const PrivacyPolicyPage(),
     ),
+    GoRoute(path: '/terms', builder: (_, _) => const TermsPage()),
     GoRoute(path: '/edit-profile', builder: (_, _) => const EditProfilePage()),
     GoRoute(path: '/own-profile', builder: (_, _) => const OwnProfilePage()),
     GoRoute(

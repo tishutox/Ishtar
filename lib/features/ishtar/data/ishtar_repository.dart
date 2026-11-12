@@ -255,7 +255,7 @@ class IshtarRepository {
         .toList();
     if (words.isEmpty) return '';
     final title = words.join(' ');
-    return title.length > 60 ? '${title.substring(0, 60).trim()}…' : title;
+    return title.length > 60 ? '${title.substring(0, 60).trim()}...' : title;
   }
 
   /// Sends [userMessage] to the assistant and returns the reply.

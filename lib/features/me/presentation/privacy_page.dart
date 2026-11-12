@@ -6,7 +6,6 @@ import 'package:lumii_quest/core/icons/app_icons.dart';
 import 'package:lumii_quest/core/responsive/content_layout.dart';
 import 'package:lumii_quest/features/account/data/account_repository.dart';
 import 'package:lumii_quest/features/ishtar/data/local_llm_service.dart';
-import 'package:lumii_quest/features/me/presentation/pin_sheet.dart';
 import 'package:lumii_quest/widgets/settings_section.dart';
 
 const Color _onColor = Color(0xFF34C759);
@@ -37,16 +36,6 @@ class _PrivacyPageState extends State<PrivacyPage> {
     if (mounted) {
       setState(() => _keepMemories = value);
     }
-  }
-
-  Future<void> _openPinSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => const PinSheet(),
-    );
   }
 
   Future<void> _toggleKeepMemories() async {
@@ -87,12 +76,12 @@ class _PrivacyPageState extends State<PrivacyPage> {
               title: 'Safety',
               dividerIndent: 16,
               children: [
+                _PrivacyLinkTile(
+                  label: 'Terms & Conditions',
+                  onTap: () => context.push('/terms'),
+                ),
                 const _PrivacyLinkTile(label: 'Blocked Users'),
                 const _PrivacyLinkTile(label: 'Support'),
-                _PrivacyLinkTile(
-                  label: 'Log-In Pin',
-                  onTap: _openPinSheet,
-                ),
               ],
             ),
           ),

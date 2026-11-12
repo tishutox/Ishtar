@@ -24,7 +24,7 @@ class PrivacyPolicyPage extends StatelessWidget {
         children: [
           ContentLayout.widthBox(
             child: const Text(
-              'Last updated: November 11, 2026',
+              'Last updated: November 12, 2026',
               style: TextStyle(color: Color(0xFF8E8E93), fontSize: 13),
             ),
           ),
@@ -55,7 +55,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 ),
                 _Paragraph(
                   'Your conversations. Your chats with Ishtar — including text, '
-                  'images, voice recordings and files you attach — are stored '
+                  'images and files you attach — are stored '
                   'only on your device. They are not uploaded to our servers '
                   'and are not synced across devices.',
                 ),
@@ -99,6 +99,14 @@ class PrivacyPolicyPage extends StatelessWidget {
                   'When the on-device model is active, your messages are '
                   'processed entirely on your device and are not sent to any '
                   'AI provider.',
+                ),
+                _Paragraph(
+                  'Voice input. When you dictate a message with the '
+                  'microphone, your speech is transcribed by your device\'s '
+                  'speech-recognition service (Google on Android, Apple on '
+                  'iOS). Depending on the service, the audio may be processed '
+                  'in the cloud by that provider under its own privacy policy. '
+                  'Only the resulting text is then sent as a normal message.',
                 ),
               ],
             ),
