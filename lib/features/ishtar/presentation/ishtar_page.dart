@@ -1156,6 +1156,10 @@ class _IshtarFileBubble extends StatelessWidget {
   }
 }
 
+/// Decoded image bytes cached by path, so scrolling a bubble back into view
+/// renders instantly instead of flickering through the loading placeholder.
+final Map<String, Uint8List> _imageBytesCache = {};
+
 class _IshtarImageBubble extends StatefulWidget {
   const _IshtarImageBubble({required this.path});
 
@@ -1172,12 +1176,16 @@ class _IshtarImageBubbleState extends State<_IshtarImageBubble> {
   @override
   void initState() {
     super.initState();
-    unawaited(_load());
+    _bytes = _imageBytesCache[widget.path];
+    if (_bytes == null) {
+      unawaited(_load());
+    }
   }
 
   Future<void> _load() async {
     try {
       final bytes = await readMediaFile(widget.path);
+      _imageBytesCache[widget.path] = bytes;
       if (mounted) setState(() => _bytes = bytes);
     } catch (_) {
       if (mounted) setState(() => _failed = true);

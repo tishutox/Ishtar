@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -208,9 +209,12 @@ class IshtarRepository {
   Future<Uint8List> generateImage(String prompt) async {
     final tag = await loadImageTag();
     final fullPrompt = '${tag.prompt}\n\n$prompt';
+    // A fresh random seed per request so two identical prompts still produce
+    // different images (Pollinations otherwise reuses a fixed seed + cache).
+    final seed = Random().nextInt(1000000);
     final uri = Uri.parse(
       '$_imageUrl/${Uri.encodeComponent(fullPrompt)}'
-      '?width=1024&height=1024&model=flux&nologo=true',
+      '?width=1024&height=1024&model=flux&nologo=true&seed=$seed',
     );
     final client = http.Client();
     try {
