@@ -77,7 +77,7 @@ class _IshtarPageState extends State<IshtarPage> {
     unawaited(_loadModelDownloaded());
     // When a chat is opened (or switched to), start at the latest message
     // instead of the top of the history.
-    _scrollToBottom();
+    _scrollToBottom(force: true);
   }
 
   @override
@@ -89,7 +89,14 @@ class _IshtarPageState extends State<IshtarPage> {
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false}) {
+    // Decide synchronously, before the new message changes the scroll extent,
+    // so a tall image or long reply doesn't read as "the user scrolled up".
+    final nearBottom = !_scrollController.hasClients ||
+        _scrollController.position.maxScrollExtent -
+                _scrollController.position.pixels <=
+            240;
+    if (!force && !nearBottom) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -265,7 +272,7 @@ class _IshtarPageState extends State<IshtarPage> {
     // Persist the user message immediately so the chat is saved even if the
     // reply is slow or fails.
     _persist();
-    _scrollToBottom();
+    _scrollToBottom(force: true);
 
     if (_genType == GenType.image) {
       await _generateImageReply(text, generationId, shouldTitle);
@@ -1149,43 +1156,60 @@ class _IshtarFileBubble extends StatelessWidget {
   }
 }
 
-class _IshtarImageBubble extends StatelessWidget {
+class _IshtarImageBubble extends StatefulWidget {
   const _IshtarImageBubble({required this.path});
 
   final String path;
 
   @override
+  State<_IshtarImageBubble> createState() => _IshtarImageBubbleState();
+}
+
+class _IshtarImageBubbleState extends State<_IshtarImageBubble> {
+  Uint8List? _bytes;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final bytes = await readMediaFile(widget.path);
+      if (mounted) setState(() => _bytes = bytes);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bytes = _bytes;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 260),
-          child: FutureBuilder<Uint8List>(
-            future: readMediaFile(path),
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const SizedBox(
+          child: _failed
+              ? const SizedBox(
                   width: 180,
                   height: 140,
                   child: Center(child: AppIcon(AppIcons.imageOff)),
-                );
-              }
-              if (!snapshot.hasData) {
-                return const SizedBox(
-                  width: 180,
-                  height: 140,
+                )
+              : bytes == null
+              ? const SizedBox(
+                  width: 260,
+                  height: 260,
                   child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              return Image.memory(
-                snapshot.data!,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.medium,
-              );
-            },
-          ),
+                )
+              : Image.memory(
+                  bytes,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                ),
         ),
       ),
     );
