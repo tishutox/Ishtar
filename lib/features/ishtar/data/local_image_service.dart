@@ -237,8 +237,9 @@ class LocalImageService {
         inputs[name] =
             OrtValueTensor.createFloat16Tensor(_toHalf(latent), [1, 4, 64, 64]);
       } else if (lower.contains('time')) {
-        inputs[name] = OrtValueTensor.createTensorWithDataList(
-          Int32List.fromList([timestep]),
+        // The WebNN export expects the timestep as a float16 scalar.
+        inputs[name] = OrtValueTensor.createFloat16Tensor(
+          _toHalf(Float32List.fromList([timestep.toDouble()])),
           [1],
         );
       } else {
