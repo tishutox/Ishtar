@@ -198,6 +198,71 @@ class OrtSession {
     return list;
   }
 
+  /// Shapes of each input, in the same order as [inputNames].
+  List<List<int>> get inputShapes =>
+      List.generate(_inputCount, (i) => _shapeOf(i, output: false));
+
+  /// Shapes of each output, in the same order as [outputNames].
+  List<List<int>> get outputShapes =>
+      List.generate(_outputCount, (i) => _shapeOf(i, output: true));
+
+  List<int> _shapeOf(int index, {required bool output}) {
+    final typeInfoPtrPtr = calloc<ffi.Pointer<bg.OrtTypeInfo>>();
+    final getTypeInfo = output
+        ? OrtEnv.instance.ortApiPtr.ref.SessionGetOutputTypeInfo
+        : OrtEnv.instance.ortApiPtr.ref.SessionGetInputTypeInfo;
+    var statusPtr = getTypeInfo.asFunction<
+            bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSession>, int,
+                ffi.Pointer<ffi.Pointer<bg.OrtTypeInfo>>)>()(
+        _ptr, index, typeInfoPtrPtr);
+    OrtStatus.checkOrtStatus(statusPtr);
+
+    final tensorInfoPtrPtr =
+        calloc<ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>>();
+    statusPtr = OrtEnv.instance.ortApiPtr.ref.CastTypeInfoToTensorInfo
+            .asFunction<
+                bg.OrtStatusPtr Function(
+                    ffi.Pointer<bg.OrtTypeInfo>,
+                    ffi.Pointer<ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>>)>()(
+        typeInfoPtrPtr.value, tensorInfoPtrPtr);
+    OrtStatus.checkOrtStatus(statusPtr);
+
+    final countPtr = calloc<ffi.Size>();
+    statusPtr = OrtEnv.instance.ortApiPtr.ref.GetDimensionsCount.asFunction<
+            bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>,
+                ffi.Pointer<ffi.Size>)>()(
+        tensorInfoPtrPtr.value, countPtr);
+    OrtStatus.checkOrtStatus(statusPtr);
+    final count = countPtr.value;
+    calloc.free(countPtr);
+
+    final shape = <int>[];
+    if (count > 0) {
+      final dimsPtr = calloc<ffi.Int64>(count);
+      statusPtr = OrtEnv.instance.ortApiPtr.ref.GetDimensions.asFunction<
+              bg.OrtStatusPtr Function(
+                  ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>,
+                  ffi.Pointer<ffi.Int64>,
+                  int)>()(
+          tensorInfoPtrPtr.value, dimsPtr, count);
+      OrtStatus.checkOrtStatus(statusPtr);
+      for (var i = 0; i < count; i++) {
+        shape.add(dimsPtr[i]);
+      }
+      calloc.free(dimsPtr);
+    }
+
+    OrtEnv.instance.ortApiPtr.ref.ReleaseTensorTypeAndShapeInfo
+        .asFunction<void Function(ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>)>()(
+        tensorInfoPtrPtr.value);
+    calloc.free(tensorInfoPtrPtr);
+    OrtEnv.instance.ortApiPtr.ref.ReleaseTypeInfo
+        .asFunction<void Function(ffi.Pointer<bg.OrtTypeInfo>)>()(
+        typeInfoPtrPtr.value);
+    calloc.free(typeInfoPtrPtr);
+    return shape;
+  }
+
   /// Performs inference synchronously.
   List<OrtValue?> run(OrtRunOptions runOptions, Map<String, OrtValue> inputs,
       [List<String>? outputNames]) {

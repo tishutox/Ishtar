@@ -168,12 +168,12 @@ class LocalImageService {
     final tokenizer = ClipTokenizer.fromJson(tokenizerJson);
     final inputIds = tokenizer.tokenize(prompt);
 
-    // 1) Text encoder: input_ids [1,77] -> last_hidden_state [1,77,1024].
+    // 1) Text encoder: input_ids -> last_hidden_state.
     final encoder = await _session(_textEncoderName);
     final encInput = _intTensor(
       encoder.inputElementTypes.first,
       inputIds,
-      [1, 77],
+      encoder.inputShapes.first,
     );
     final encOutputs = encoder.run(
       OrtRunOptions(),
@@ -185,14 +185,15 @@ class LocalImageService {
       o?.release();
     }
 
-    // 2) Random latent [1,4,64,64] (gaussian).
-    final latent = _randn(4 * 64 * 64);
+    // 2) UNet session + its latent ("sample") shape.
+    final unet = await _session(_unetName);
+    final latentShape = _sampleShape(unet);
+    final latent = _randn(_product(latentShape));
 
     // 3) UNet: single denoising step.
     //    ITERATION-1 TODO: verify the SD-Turbo timestep schedule. SD-Turbo
     //    runs EulerAncestralDiscrete with `timestep_spacing="trailing"` and
     //    1..4 steps; below we use t=999 and a plain DDPM epsilon->x0 step.
-    final unet = await _session(_unetName);
     final unetInputs = _unetInputs(unet, latent, 999, textEmb);
     final unetOutputs = unet.run(OrtRunOptions(), unetInputs);
     final noise = _toFloat32(unetOutputs[0]?.value);
@@ -212,7 +213,7 @@ class LocalImageService {
     final vaeInput = _floatTensor(
       vae.inputElementTypes.first,
       _scaleBy(denoised, 1 / 0.18215),
-      [1, 4, 64, 64],
+      vae.inputShapes.first,
     );
     final vaeOutputs = vae.run(
       OrtRunOptions(),
@@ -240,26 +241,41 @@ class LocalImageService {
     final inputs = <String, OrtValue>{};
     final names = session.inputNames;
     final types = session.inputElementTypes;
+    final shapes = session.inputShapes;
     for (var i = 0; i < names.length; i++) {
       final name = names[i];
       final type = types[i];
+      final shape = shapes[i];
       final lower = name.toLowerCase();
       if (lower.contains('sample') || lower.contains('latent')) {
-        inputs[name] = _floatTensor(type, latent, [1, 4, 64, 64]);
+        inputs[name] = _floatTensor(type, latent, shape);
       } else if (lower.contains('time')) {
         inputs[name] = (type == _kFloat16 || type == _kFloat32)
             ? _floatTensor(
                 type,
                 Float32List.fromList([timestep.toDouble()]),
-                [1],
+                shape,
               )
-            : _intTensor(type, [timestep], [1]);
+            : _intTensor(type, [timestep], shape);
       } else {
-        inputs[name] = _floatTensor(type, textEmb, [1, 77, 1024]);
+        inputs[name] = _floatTensor(type, textEmb, shape);
       }
     }
     return inputs;
   }
+
+  /// Finds the UNet's latent ("sample") input shape.
+  List<int> _sampleShape(OrtSession session) {
+    for (var i = 0; i < session.inputNames.length; i++) {
+      final lower = session.inputNames[i].toLowerCase();
+      if (lower.contains('sample') || lower.contains('latent')) {
+        return session.inputShapes[i];
+      }
+    }
+    return [1, 4, 64, 64];
+  }
+
+  int _product(List<int> shape) => shape.fold(1, (a, b) => a * b);
 
   /// DDPM epsilon-prediction -> x0.
   /// ITERATION-1 TODO: replace with the exact SD-Turbo sigma schedule.
