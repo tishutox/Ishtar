@@ -166,13 +166,34 @@ class LocalImageService {
     session?.release();
   }
 
+  /// Records the current inference step to logcat and a small file so the
+  /// crash point survives a native abort.
+  Future<void> _checkpoint(String step) async {
+    print('[Ishtar] local-image: $step');
+    try {
+      final dir = await getApplicationSupportDirectory();
+      await File('${dir.path}/ishtar_img_step.txt').writeAsString(step);
+    } catch (_) {}
+  }
+
+  static Future<String?> readLastStep() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/ishtar_img_step.txt');
+      if (!file.existsSync()) return null;
+      return await file.readAsString();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Uint8List> generateImage(String prompt) async {
     await ensureDownloaded();
 
     final tokenizerJson = await _file(_tokenizerName).then((f) => f.readAsString());
     final tokenizer = ClipTokenizer.fromJson(tokenizerJson);
     final inputIds = tokenizer.tokenize(prompt);
-    print('[Ishtar] local-image: tokenized');
+    await _checkpoint('tokenized');
 
     // 1) Text encoder: input_ids -> last_hidden_state.
     final encoder = await _session(_textEncoderName);
@@ -191,10 +212,10 @@ class LocalImageService {
       o?.release();
     }
     _releaseSession(_textEncoderName);
-    print('[Ishtar] local-image: text encoder done');
+    await _checkpoint('text encoder done');
 
     // 2) UNet session + its latent ("sample") shape.
-    print('[Ishtar] local-image: loading UNet');
+    await _checkpoint('loading UNet');
     final unet = await _session(_unetName);
     final latentShape = _sampleShape(unet);
     final latent = _randn(_product(latentShape));
@@ -213,14 +234,14 @@ class LocalImageService {
       o?.release();
     }
     _releaseSession(_unetName);
-    print('[Ishtar] local-image: UNet done');
+    await _checkpoint('UNet done');
 
     // 4) Denoise to x0.
     final denoised = _denoise(latent, noise, 999);
 
     // 5) VAE decoder: latent_sample -> sample.
     //    SD VAE latent scale factor 0.18215.
-    print('[Ishtar] local-image: loading VAE');
+    await _checkpoint('loading VAE');
     final vae = await _session(_vaeName);
     final vaeInput = _floatTensor(
       vae.inputElementTypes.first,
@@ -236,7 +257,7 @@ class LocalImageService {
     for (final o in vaeOutputs) {
       o?.release();
     }
-    print('[Ishtar] local-image: VAE done');
+    await _checkpoint('VAE done');
 
     // 6) VAE output [1,3,512,512] in [-1,1] -> RGB JPEG bytes.
     return _vaeToJpeg(image);

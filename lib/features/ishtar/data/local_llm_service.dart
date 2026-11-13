@@ -230,4 +230,13 @@ class LocalLlmService {
       return null;
     }
   }
+
+  /// Deletes the native crash log so the dialog only appears once.
+  Future<void> clearCrashLog() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/crash.log');
+      if (file.existsSync()) await file.delete();
+    } catch (_) {}
+  }
 }

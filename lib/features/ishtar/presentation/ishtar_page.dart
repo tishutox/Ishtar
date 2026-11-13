@@ -140,6 +140,11 @@ class _IshtarPageState extends State<IshtarPage> {
   Future<void> _checkCrashLog() async {
     final log = await LocalLlmService.instance.readCrashLog();
     if (!mounted || log == null || log.trim().isEmpty) return;
+    // Clear it immediately so the dialog only appears once per crash.
+    unawaited(LocalLlmService.instance.clearCrashLog());
+    final step = await LocalImageService.readLastStep();
+    if (!mounted) return;
+    final full = step == null ? log : 'Last image step: $step\n\n$log';
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -147,13 +152,13 @@ class _IshtarPageState extends State<IshtarPage> {
         content: SizedBox(
           width: double.maxFinite,
           child: SingleChildScrollView(
-            child: SelectableText(log, style: const TextStyle(fontSize: 12)),
+            child: SelectableText(full, style: const TextStyle(fontSize: 12)),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: log));
+              Clipboard.setData(ClipboardData(text: full));
               Navigator.of(context).pop();
             },
             child: const Text('Copy'),
