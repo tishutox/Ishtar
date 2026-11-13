@@ -154,11 +154,16 @@ class LocalImageService {
     OrtEnv.instance.init();
     final file = await _file(name);
     final options = OrtSessionOptions()
-      ..setIntraOpNumThreads(4)
-      ..setSessionGraphOptimizationLevel(GraphOptimizationLevel.ortEnableAll);
+      ..setIntraOpNumThreads(2)
+      ..setSessionGraphOptimizationLevel(GraphOptimizationLevel.ortEnableBasic);
     final session = OrtSession.fromFile(file, options);
     _sessions[name] = session;
     return session;
+  }
+
+  void _releaseSession(String name) {
+    final session = _sessions.remove(name);
+    session?.release();
   }
 
   Future<Uint8List> generateImage(String prompt) async {
@@ -167,6 +172,7 @@ class LocalImageService {
     final tokenizerJson = await _file(_tokenizerName).then((f) => f.readAsString());
     final tokenizer = ClipTokenizer.fromJson(tokenizerJson);
     final inputIds = tokenizer.tokenize(prompt);
+    print('[Ishtar] local-image: tokenized');
 
     // 1) Text encoder: input_ids -> last_hidden_state.
     final encoder = await _session(_textEncoderName);
@@ -184,8 +190,11 @@ class LocalImageService {
     for (final o in encOutputs) {
       o?.release();
     }
+    _releaseSession(_textEncoderName);
+    print('[Ishtar] local-image: text encoder done');
 
     // 2) UNet session + its latent ("sample") shape.
+    print('[Ishtar] local-image: loading UNet');
     final unet = await _session(_unetName);
     final latentShape = _sampleShape(unet);
     final latent = _randn(_product(latentShape));
@@ -203,12 +212,15 @@ class LocalImageService {
     for (final o in unetOutputs) {
       o?.release();
     }
+    _releaseSession(_unetName);
+    print('[Ishtar] local-image: UNet done');
 
     // 4) Denoise to x0.
     final denoised = _denoise(latent, noise, 999);
 
-    // 5) VAE decoder: latent_sample [1,4,64,64] -> sample [1,3,512,512].
+    // 5) VAE decoder: latent_sample -> sample.
     //    SD VAE latent scale factor 0.18215.
+    print('[Ishtar] local-image: loading VAE');
     final vae = await _session(_vaeName);
     final vaeInput = _floatTensor(
       vae.inputElementTypes.first,
@@ -224,6 +236,7 @@ class LocalImageService {
     for (final o in vaeOutputs) {
       o?.release();
     }
+    print('[Ishtar] local-image: VAE done');
 
     // 6) VAE output [1,3,512,512] in [-1,1] -> RGB JPEG bytes.
     return _vaeToJpeg(image);
