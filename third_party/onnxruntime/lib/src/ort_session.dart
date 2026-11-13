@@ -153,6 +153,51 @@ class OrtSession {
     return list;
   }
 
+  /// Returns the raw `ONNXTensorElementDataType` value for each input, in the
+  /// same order as [inputNames].
+  List<int> get inputElementTypes {
+    final list = <int>[];
+    for (var i = 0; i < _inputCount; ++i) {
+      final typeInfoPtrPtr = calloc<ffi.Pointer<bg.OrtTypeInfo>>();
+      var statusPtr = OrtEnv.instance.ortApiPtr.ref.SessionGetInputTypeInfo
+              .asFunction<
+                  bg.OrtStatusPtr Function(
+                      ffi.Pointer<bg.OrtSession>,
+                      int,
+                      ffi.Pointer<ffi.Pointer<bg.OrtTypeInfo>>)>()(
+          _ptr, i, typeInfoPtrPtr);
+      OrtStatus.checkOrtStatus(statusPtr);
+      final tensorInfoPtrPtr =
+          calloc<ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>>();
+      statusPtr = OrtEnv.instance.ortApiPtr.ref.CastTypeInfoToTensorInfo
+              .asFunction<
+                  bg.OrtStatusPtr Function(
+                      ffi.Pointer<bg.OrtTypeInfo>,
+                      ffi.Pointer<ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>>)>()(
+          typeInfoPtrPtr.value, tensorInfoPtrPtr);
+      OrtStatus.checkOrtStatus(statusPtr);
+      final elementTypePtr = calloc<ffi.Int32>();
+      statusPtr = OrtEnv.instance.ortApiPtr.ref.GetTensorElementType
+              .asFunction<
+                  bg.OrtStatusPtr Function(
+                      ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>,
+                      ffi.Pointer<ffi.Int32>)>()(
+          tensorInfoPtrPtr.value, elementTypePtr);
+      OrtStatus.checkOrtStatus(statusPtr);
+      list.add(elementTypePtr.value);
+      calloc.free(elementTypePtr);
+      OrtEnv.instance.ortApiPtr.ref.ReleaseTensorTypeAndShapeInfo
+          .asFunction<void Function(ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>)>()(
+          tensorInfoPtrPtr.value);
+      calloc.free(tensorInfoPtrPtr);
+      OrtEnv.instance.ortApiPtr.ref.ReleaseTypeInfo
+          .asFunction<void Function(ffi.Pointer<bg.OrtTypeInfo>)>()(
+          typeInfoPtrPtr.value);
+      calloc.free(typeInfoPtrPtr);
+    }
+    return list;
+  }
+
   /// Performs inference synchronously.
   List<OrtValue?> run(OrtRunOptions runOptions, Map<String, OrtValue> inputs,
       [List<String>? outputNames]) {

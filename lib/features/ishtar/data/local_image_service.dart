@@ -27,6 +27,11 @@ class LocalImageService {
   static const String _vaeName = 'vae_decoder_model_f16.onnx';
   static const String _tokenizerName = 'tokenizer.json';
 
+  // ONNX TensorElementDataType values.
+  static const int _kFloat32 = 1;
+  static const int _kInt32 = 6;
+  static const int _kFloat16 = 10;
+
   final Map<String, OrtSession> _sessions = {};
 
   // ---------------------------------------------------------------------
@@ -165,9 +170,9 @@ class LocalImageService {
 
     // 1) Text encoder: input_ids [1,77] -> last_hidden_state [1,77,1024].
     final encoder = await _session(_textEncoderName);
-    // WebNN export expects int32 for input_ids (not the diffusers int64).
-    final encInput = OrtValueTensor.createTensorWithDataList(
-      Int32List.fromList(inputIds),
+    final encInput = _intTensor(
+      encoder.inputElementTypes.first,
+      inputIds,
       [1, 77],
     );
     final encOutputs = encoder.run(
@@ -204,8 +209,9 @@ class LocalImageService {
     // 5) VAE decoder: latent_sample [1,4,64,64] -> sample [1,3,512,512].
     //    SD VAE latent scale factor 0.18215.
     final vae = await _session(_vaeName);
-    final vaeInput = OrtValueTensor.createFloat16Tensor(
-      _toHalf(_scaleBy(denoised, 1 / 0.18215)),
+    final vaeInput = _floatTensor(
+      vae.inputElementTypes.first,
+      _scaleBy(denoised, 1 / 0.18215),
       [1, 4, 64, 64],
     );
     final vaeOutputs = vae.run(
@@ -222,8 +228,9 @@ class LocalImageService {
     return _vaeToJpeg(image);
   }
 
-  /// Maps the UNet's three inputs by name. The names differ across ONNX
-  /// exports, so match heuristically on the lower-cased name.
+  /// Maps the UNet's three inputs by name, matching each tensor's dtype to the
+  /// session's expected input type. The names differ across ONNX exports, so
+  /// match heuristically on the lower-cased name.
   Map<String, OrtValue> _unetInputs(
     OrtSession session,
     Float32List latent,
@@ -231,22 +238,24 @@ class LocalImageService {
     Float32List textEmb,
   ) {
     final inputs = <String, OrtValue>{};
-    for (final name in session.inputNames) {
+    final names = session.inputNames;
+    final types = session.inputElementTypes;
+    for (var i = 0; i < names.length; i++) {
+      final name = names[i];
+      final type = types[i];
       final lower = name.toLowerCase();
       if (lower.contains('sample') || lower.contains('latent')) {
-        inputs[name] =
-            OrtValueTensor.createFloat16Tensor(_toHalf(latent), [1, 4, 64, 64]);
+        inputs[name] = _floatTensor(type, latent, [1, 4, 64, 64]);
       } else if (lower.contains('time')) {
-        // The WebNN export expects the timestep as a float16 scalar.
-        inputs[name] = OrtValueTensor.createFloat16Tensor(
-          _toHalf(Float32List.fromList([timestep.toDouble()])),
-          [1],
-        );
+        inputs[name] = (type == _kFloat16 || type == _kFloat32)
+            ? _floatTensor(
+                type,
+                Float32List.fromList([timestep.toDouble()]),
+                [1],
+              )
+            : _intTensor(type, [timestep], [1]);
       } else {
-        inputs[name] = OrtValueTensor.createFloat16Tensor(
-          _toHalf(textEmb),
-          [1, 77, 1024],
-        );
+        inputs[name] = _floatTensor(type, textEmb, [1, 77, 1024]);
       }
     }
     return inputs;
@@ -343,6 +352,29 @@ class LocalImageService {
       out[i] = _floatToHalf(data[i]);
     }
     return out;
+  }
+
+  /// Creates a float tensor matching the model's expected [expectedType].
+  OrtValueTensor _floatTensor(
+    int expectedType,
+    Float32List data,
+    List<int> shape,
+  ) {
+    if (expectedType == _kFloat16) {
+      return OrtValueTensor.createFloat16Tensor(_toHalf(data), shape);
+    }
+    return OrtValueTensor.createTensorWithDataList(data, shape);
+  }
+
+  /// Creates an integer tensor matching the model's expected [expectedType].
+  OrtValueTensor _intTensor(int expectedType, List<int> data, List<int> shape) {
+    if (expectedType == _kInt32) {
+      return OrtValueTensor.createTensorWithDataList(
+        Int32List.fromList(data),
+        shape,
+      );
+    }
+    return OrtValueTensor.createTensorWithDataList(data, shape);
   }
 
   /// Converts a float32 value to its IEEE 754 half-precision bit pattern.
