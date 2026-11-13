@@ -440,6 +440,50 @@ class OrtValueTensor extends OrtValue {
     return OrtValueTensor(ortValuePtr, dataPtr);
   }
 
+  /// Creates a float16 tensor from raw half-precision bit patterns.
+  static OrtValueTensor createFloat16Tensor(Uint16List data, List<int> shape) {
+    final dataSize = data.length;
+    final dataPtr = (calloc<ffi.Uint16>(dataSize)
+          ..asTypedList(dataSize).setRange(0, dataSize, data))
+        .cast<ffi.Void>();
+
+    final shapeSize = shape.length;
+    final shapePtr = calloc<ffi.Int64>(shapeSize);
+    shapePtr.asTypedList(shapeSize).setRange(0, shapeSize, shape);
+
+    final ortMemoryInfoPtrPtr = calloc<ffi.Pointer<bg.OrtMemoryInfo>>();
+    var statusPtr = OrtEnv.instance.ortApiPtr.ref.AllocatorGetInfo.asFunction<
+            bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtAllocator>,
+                ffi.Pointer<ffi.Pointer<bg.OrtMemoryInfo>>)>()(
+        OrtAllocator.instance.ptr, ortMemoryInfoPtrPtr);
+    OrtStatus.checkOrtStatus(statusPtr);
+    final ortMemoryInfoPtr = ortMemoryInfoPtrPtr.value;
+    final ortValuePtrPtr = calloc<ffi.Pointer<bg.OrtValue>>();
+    statusPtr = OrtEnv.instance.ortApiPtr.ref.CreateTensorWithDataAsOrtValue
+            .asFunction<
+                bg.OrtStatusPtr Function(
+                    ffi.Pointer<bg.OrtMemoryInfo>,
+                    ffi.Pointer<ffi.Void>,
+                    int,
+                    ffi.Pointer<ffi.Int64>,
+                    int,
+                    int,
+                    ffi.Pointer<ffi.Pointer<bg.OrtValue>>)>()(
+        ortMemoryInfoPtr,
+        dataPtr,
+        dataSize * 2,
+        shapePtr,
+        shapeSize,
+        ONNXTensorElementDataType.float16.value,
+        ortValuePtrPtr);
+    OrtStatus.checkOrtStatus(statusPtr);
+    final ortValuePtr = ortValuePtrPtr.value;
+    calloc.free(shapePtr);
+    calloc.free(ortValuePtrPtr);
+    calloc.free(ortMemoryInfoPtrPtr);
+    return OrtValueTensor(ortValuePtr, dataPtr);
+  }
+
   @override
   dynamic get value {
     if (_info._dimensionsCount == 0) {

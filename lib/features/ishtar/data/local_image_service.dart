@@ -204,8 +204,8 @@ class LocalImageService {
     // 5) VAE decoder: latent_sample [1,4,64,64] -> sample [1,3,512,512].
     //    SD VAE latent scale factor 0.18215.
     final vae = await _session(_vaeName);
-    final vaeInput = OrtValueTensor.createTensorWithDataList(
-      _scaleBy(denoised, 1 / 0.18215),
+    final vaeInput = OrtValueTensor.createFloat16Tensor(
+      _toHalf(_scaleBy(denoised, 1 / 0.18215)),
       [1, 4, 64, 64],
     );
     final vaeOutputs = vae.run(
@@ -235,15 +235,17 @@ class LocalImageService {
       final lower = name.toLowerCase();
       if (lower.contains('sample') || lower.contains('latent')) {
         inputs[name] =
-            OrtValueTensor.createTensorWithDataList(latent, [1, 4, 64, 64]);
+            OrtValueTensor.createFloat16Tensor(_toHalf(latent), [1, 4, 64, 64]);
       } else if (lower.contains('time')) {
         inputs[name] = OrtValueTensor.createTensorWithDataList(
           Int32List.fromList([timestep]),
           [1],
         );
       } else {
-        inputs[name] =
-            OrtValueTensor.createTensorWithDataList(textEmb, [1, 77, 1024]);
+        inputs[name] = OrtValueTensor.createFloat16Tensor(
+          _toHalf(textEmb),
+          [1, 77, 1024],
+        );
       }
     }
     return inputs;
@@ -332,6 +334,36 @@ class LocalImageService {
 
     rec(value);
     return Float32List.fromList(flat);
+  }
+
+  Uint16List _toHalf(Float32List data) {
+    final out = Uint16List(data.length);
+    for (var i = 0; i < data.length; i++) {
+      out[i] = _floatToHalf(data[i]);
+    }
+    return out;
+  }
+
+  /// Converts a float32 value to its IEEE 754 half-precision bit pattern.
+  int _floatToHalf(double value) {
+    final bd = ByteData(4)..setFloat32(0, value);
+    final bits = bd.getUint32(0);
+    final sign = (bits >> 16) & 0x8000;
+    final exponent = ((bits >> 23) & 0xFF) - 127 + 15;
+    var mantissa = bits & 0x7FFFFF;
+
+    if (exponent <= 0) {
+      // subnormal or zero
+      if (exponent < -10) {
+        return sign;
+      }
+      mantissa = (mantissa | 0x800000) >> (1 - exponent);
+      return sign | (mantissa >> 13);
+    } else if (exponent >= 31) {
+      // infinity or NaN
+      return sign | 0x7C00 | (mantissa != 0 ? 0x200 : 0);
+    }
+    return sign | (exponent << 10) | ((mantissa + 0x1000) >> 13);
   }
 
   void dispose() {
