@@ -165,7 +165,11 @@ class LocalImageService {
 
     // 1) Text encoder: input_ids [1,77] -> last_hidden_state [1,77,1024].
     final encoder = await _session(_textEncoderName);
-    final encInput = OrtValueTensor.createTensorWithDataList(inputIds, [1, 77]);
+    // WebNN export expects int32 for input_ids (not the diffusers int64).
+    final encInput = OrtValueTensor.createTensorWithDataList(
+      Int32List.fromList(inputIds),
+      [1, 77],
+    );
     final encOutputs = encoder.run(
       OrtRunOptions(),
       {encoder.inputNames.first: encInput},
@@ -233,8 +237,10 @@ class LocalImageService {
         inputs[name] =
             OrtValueTensor.createTensorWithDataList(latent, [1, 4, 64, 64]);
       } else if (lower.contains('time')) {
-        inputs[name] =
-            OrtValueTensor.createTensorWithDataList([timestep], [1]);
+        inputs[name] = OrtValueTensor.createTensorWithDataList(
+          Int32List.fromList([timestep]),
+          [1],
+        );
       } else {
         inputs[name] =
             OrtValueTensor.createTensorWithDataList(textEmb, [1, 77, 1024]);
