@@ -1,4 +1,5 @@
 import 'dart:ffi' as ffi;
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -172,6 +173,13 @@ abstract class OrtValue {
       final dataPtr = _getTensorMutableData(ortValuePtr, dataPtrPtr);
       for (int i = 0; i < tensorShapeElementCount; ++i) {
         data.add(dataPtr[i]);
+      }
+      calloc.free(dataPtrPtr);
+    } else if (tensorElementType == ONNXTensorElementDataType.float16) {
+      final dataPtrPtr = calloc<ffi.Pointer<ffi.Uint16>>();
+      final dataPtr = _getTensorMutableData(ortValuePtr, dataPtrPtr);
+      for (int i = 0; i < tensorShapeElementCount; ++i) {
+        data.add(_float16ToDouble(dataPtr[i]));
       }
       calloc.free(dataPtrPtr);
     } else if (tensorElementType == ONNXTensorElementDataType.double) {
@@ -446,6 +454,7 @@ class OrtValueTensor extends OrtValue {
         case ONNXTensorElementDataType.uint64:
         case ONNXTensorElementDataType.int64:
         case ONNXTensorElementDataType.float:
+        case ONNXTensorElementDataType.float16:
         case ONNXTensorElementDataType.double:
           return _getNumList(_ptr)[0];
         case ONNXTensorElementDataType.bool:
@@ -468,6 +477,7 @@ class OrtValueTensor extends OrtValue {
         case ONNXTensorElementDataType.int64:
           return _getNumList(_ptr).reshape<int>(_info._tensorShape);
         case ONNXTensorElementDataType.float:
+        case ONNXTensorElementDataType.float16:
         case ONNXTensorElementDataType.double:
           return _getNumList(_ptr).reshape<double>(_info._tensorShape);
         case ONNXTensorElementDataType.bool:
@@ -892,4 +902,21 @@ enum OrtSparseFormat {
         return OrtSparseFormat.undefined;
     }
   }
+}
+
+/// Converts an IEEE 754 half-precision (float16) bit pattern to a [double].
+double _float16ToDouble(int h) {
+  final sign = (h >> 15) & 0x1;
+  final exponent = (h >> 10) & 0x1F;
+  final mantissa = h & 0x3FF;
+  final double value;
+  if (exponent == 0) {
+    value = math.pow(2.0, -14).toDouble() * (mantissa / 1024.0);
+  } else if (exponent == 31) {
+    value = mantissa == 0 ? double.infinity : double.nan;
+  } else {
+    value =
+        math.pow(2.0, exponent - 15).toDouble() * (1.0 + mantissa / 1024.0);
+  }
+  return sign == 1 ? -value : value;
 }
