@@ -246,7 +246,7 @@ class LocalImageService {
     final vaeInput = _floatTensor(
       vae.inputElementTypes.first,
       _scaleBy(denoised, 1 / 0.18215),
-      vae.inputShapes.first,
+      latentShape,
     );
     final vaeOutputs = vae.run(
       OrtRunOptions(),
@@ -299,11 +299,25 @@ class LocalImageService {
   }
 
   /// Finds the UNet's latent ("sample") input shape (batch dim normalized to 1).
+  ///
+  /// SD-Turbo's latent is always [1, 4, 64, 64] for a 512x512 output. Some
+  /// WebNN exports leave the channel/spatial dims symbolic, which ONNX Runtime
+  /// reports as -1; mapping those to 1 would produce a degenerate [1,1,1,1]
+  /// tensor. Only trust a reported shape when the channel/spatial dims are
+  /// concrete, otherwise fall back to the real latent layout.
   List<int> _sampleShape(OrtSession session) {
     for (var i = 0; i < session.inputNames.length; i++) {
       final lower = session.inputNames[i].toLowerCase();
       if (lower.contains('sample') || lower.contains('latent')) {
-        return session.inputShapes[i].map((d) => d <= 0 ? 1 : d).toList();
+        final mapped =
+            session.inputShapes[i].map((d) => d <= 0 ? 1 : d).toList();
+        if (mapped.length == 4 &&
+            mapped[1] > 1 &&
+            mapped[2] > 1 &&
+            mapped[3] > 1) {
+          return mapped;
+        }
+        break;
       }
     }
     return [1, 4, 64, 64];
