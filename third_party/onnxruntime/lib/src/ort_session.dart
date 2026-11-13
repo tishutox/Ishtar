@@ -186,9 +186,7 @@ class OrtSession {
       OrtStatus.checkOrtStatus(statusPtr);
       list.add(elementTypePtr.value);
       calloc.free(elementTypePtr);
-      OrtEnv.instance.ortApiPtr.ref.ReleaseTensorTypeAndShapeInfo
-          .asFunction<void Function(ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>)>()(
-          tensorInfoPtrPtr.value);
+      // The tensor info from CastTypeInfoToTensorInfo is borrowed — ReleaseTypeInfo frees it.
       calloc.free(tensorInfoPtrPtr);
       OrtEnv.instance.ortApiPtr.ref.ReleaseTypeInfo
           .asFunction<void Function(ffi.Pointer<bg.OrtTypeInfo>)>()(
@@ -252,9 +250,7 @@ class OrtSession {
       calloc.free(dimsPtr);
     }
 
-    OrtEnv.instance.ortApiPtr.ref.ReleaseTensorTypeAndShapeInfo
-        .asFunction<void Function(ffi.Pointer<bg.OrtTensorTypeAndShapeInfo>)>()(
-        tensorInfoPtrPtr.value);
+    // The tensor info from CastTypeInfoToTensorInfo is borrowed — ReleaseTypeInfo frees it.
     calloc.free(tensorInfoPtrPtr);
     OrtEnv.instance.ortApiPtr.ref.ReleaseTypeInfo
         .asFunction<void Function(ffi.Pointer<bg.OrtTypeInfo>)>()(
