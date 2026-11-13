@@ -429,22 +429,29 @@ class LocalImageService {
     return OrtValueTensor.createTensorWithDataList(data, concrete);
   }
 
-  /// Replaces a dynamic (`<= 0`) dimension with the value inferred from [total]
-  /// and the product of the other (known) dimensions.
+  /// Normalizes a model-reported shape so no dynamic (`<= 0`) dimension reaches
+  /// ONNX Runtime. SD-Turbo only ever varies the batch dimension, which is 1 for
+  /// a single prompt, so every dynamic dim is collapsed to 1. If the resulting
+  /// product still disagrees with [total] (a non-batch dynamic dim), fall back
+  /// to inferring that dim from the data length.
   List<int> _concreteShape(List<int> shape, int total) {
-    final result = List<int>.from(shape);
-    var knownProduct = 1;
-    var dynamicIndex = -1;
-    for (var i = 0; i < shape.length; i++) {
-      if (shape[i] <= 0) {
-        dynamicIndex = i;
-      } else {
-        knownProduct *= shape[i];
+    final result = shape.map((d) => d <= 0 ? 1 : d).toList();
+    final product = result.fold(1, (a, b) => a * b);
+    if (product != total) {
+      var knownProduct = 1;
+      var dynamicIndex = -1;
+      for (var i = 0; i < shape.length; i++) {
+        if (shape[i] <= 0) {
+          dynamicIndex = i;
+        } else {
+          knownProduct *= shape[i];
+        }
+      }
+      if (dynamicIndex >= 0 && knownProduct > 0) {
+        result[dynamicIndex] = total ~/ knownProduct;
       }
     }
-    if (dynamicIndex >= 0 && knownProduct > 0) {
-      result[dynamicIndex] = total ~/ knownProduct;
-    }
+    print('[Ishtar] local-image: shape raw=$shape total=$total -> $result');
     return result;
   }
 
