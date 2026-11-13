@@ -298,12 +298,12 @@ class LocalImageService {
     return inputs;
   }
 
-  /// Finds the UNet's latent ("sample") input shape.
+  /// Finds the UNet's latent ("sample") input shape (batch dim normalized to 1).
   List<int> _sampleShape(OrtSession session) {
     for (var i = 0; i < session.inputNames.length; i++) {
       final lower = session.inputNames[i].toLowerCase();
       if (lower.contains('sample') || lower.contains('latent')) {
-        return session.inputShapes[i];
+        return session.inputShapes[i].map((d) => d <= 0 ? 1 : d).toList();
       }
     }
     return [1, 4, 64, 64];
@@ -410,21 +410,42 @@ class LocalImageService {
     Float32List data,
     List<int> shape,
   ) {
+    final concrete = _concreteShape(shape, data.length);
     if (expectedType == _kFloat16) {
-      return OrtValueTensor.createFloat16Tensor(_toHalf(data), shape);
+      return OrtValueTensor.createFloat16Tensor(_toHalf(data), concrete);
     }
-    return OrtValueTensor.createTensorWithDataList(data, shape);
+    return OrtValueTensor.createTensorWithDataList(data, concrete);
   }
 
   /// Creates an integer tensor matching the model's expected [expectedType].
   OrtValueTensor _intTensor(int expectedType, List<int> data, List<int> shape) {
+    final concrete = _concreteShape(shape, data.length);
     if (expectedType == _kInt32) {
       return OrtValueTensor.createTensorWithDataList(
         Int32List.fromList(data),
-        shape,
+        concrete,
       );
     }
-    return OrtValueTensor.createTensorWithDataList(data, shape);
+    return OrtValueTensor.createTensorWithDataList(data, concrete);
+  }
+
+  /// Replaces a dynamic (`<= 0`) dimension with the value inferred from [total]
+  /// and the product of the other (known) dimensions.
+  List<int> _concreteShape(List<int> shape, int total) {
+    final result = List<int>.from(shape);
+    var knownProduct = 1;
+    var dynamicIndex = -1;
+    for (var i = 0; i < shape.length; i++) {
+      if (shape[i] <= 0) {
+        dynamicIndex = i;
+      } else {
+        knownProduct *= shape[i];
+      }
+    }
+    if (dynamicIndex >= 0 && knownProduct > 0) {
+      result[dynamicIndex] = total ~/ knownProduct;
+    }
+    return result;
   }
 
   /// Converts a float32 value to its IEEE 754 half-precision bit pattern.
