@@ -222,9 +222,9 @@ class LocalImageService {
     // (microsoft/webnn-developer-preview/demos/sd-turbo):
     //   sigma  = 14.6146
     //   latent = randn * sigma                    (noise init)
-    //   scaled = latent / sqrt(sigma^2 + 1)       (scale_model_inputs)
+    //   scaled = latent / sqrt(sigma^2 + 1)       (scale_model_inputs -> UNet)
     //   eps    = unet(scaled, t=999, ...)
-    //   x0     = scaled - sigma * eps             (Euler-A step, gamma=0)
+    //   x0     = latent - sigma * eps             (Euler-A step, gamma=0)
     //   vae_in = x0 / 0.18215
     const sigma = 14.6146;
     final latent = _scaleBy(_randn(_product(latentShape)), sigma);
@@ -243,8 +243,10 @@ class LocalImageService {
     _releaseSession(_unetName);
     await _checkpoint('UNet done');
 
-    // 4) Denoise to x0 (pred_original_sample = scaled - sigma * epsilon).
-    final denoised = _denoise(scaled, noise, sigma);
+    // 4) Denoise to x0 (pred_original_sample = latent - sigma * epsilon).
+    //    Note: the step uses the UNSCALED latent (randn*sigma) as `sample`,
+    //    while the UNet received the scaled `latent_model_input`.
+    final denoised = _denoise(latent, noise, sigma);
 
     // 5) VAE decoder: latent_sample -> sample.
     //    SD VAE latent scale factor 0.18215.
