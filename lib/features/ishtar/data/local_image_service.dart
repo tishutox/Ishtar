@@ -218,14 +218,20 @@ class LocalImageService {
     await _checkpoint('loading UNet');
     final unet = await _session(_unetName);
     final latentShape = _sampleShape(unet);
-    // SD-Turbo is a distilled one-step model. Its EulerAncestralDiscrete
-    // scheduler (timestep_spacing="trailing", num_inference_steps=1) starts
-    // from noise scaled to sigma_max and recovers x0 = latent - sigma*epsilon.
-    const sigmaMax = 14.6146;
-    final latent = _scaleBy(_randn(_product(latentShape)), sigmaMax);
+    // SD-Turbo one-step inference, per the official WebNN sample
+    // (microsoft/webnn-developer-preview/demos/sd-turbo):
+    //   sigma  = 14.6146
+    //   latent = randn * sigma                    (noise init)
+    //   scaled = latent / sqrt(sigma^2 + 1)       (scale_model_inputs)
+    //   eps    = unet(scaled, t=999, ...)
+    //   x0     = scaled - sigma * eps             (Euler-A step, gamma=0)
+    //   vae_in = x0 / 0.18215
+    const sigma = 14.6146;
+    final latent = _scaleBy(_randn(_product(latentShape)), sigma);
+    final scaled = _scaleBy(latent, 1 / math.sqrt(sigma * sigma + 1));
 
-    // 3) UNet: single denoising step (timestep 999 = trailing one-step).
-    final unetInputs = _unetInputs(unet, latent, 999, textEmb);
+    // 3) UNet: single denoising step (timestep 999).
+    final unetInputs = _unetInputs(unet, scaled, 999, textEmb);
     final unetOutputs = unet.run(OrtRunOptions(), unetInputs);
     final noise = _toFloat32(unetOutputs[0]?.value);
     for (final v in unetInputs.values) {
@@ -237,8 +243,8 @@ class LocalImageService {
     _releaseSession(_unetName);
     await _checkpoint('UNet done');
 
-    // 4) Denoise to x0 (pred_original_sample = latent - sigma * epsilon).
-    final denoised = _denoise(latent, noise, sigmaMax);
+    // 4) Denoise to x0 (pred_original_sample = scaled - sigma * epsilon).
+    final denoised = _denoise(scaled, noise, sigma);
 
     // 5) VAE decoder: latent_sample -> sample.
     //    SD VAE latent scale factor 0.18215.
