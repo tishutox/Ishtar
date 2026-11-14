@@ -351,11 +351,12 @@ class _IshtarPageState extends State<IshtarPage> {
     Object? error;
     try {
       final useLocal = LocalLlmService.instance.useLocal;
-      // The cloud path prepends the selected image tag's style prompt inside
-      // IshtarRepository.generateImage; the local path must do the same so the
-      // tag is honored by the on-device model too.
+      // Put the user's subject FIRST and append the tag's style prompt after
+      // it: the on-device tokenizer truncates to 77 tokens, so the subject
+      // must come first to survive truncation (the cloud path does the same
+      // inside IshtarRepository.generateImage).
       final imagePrompt = useLocal
-          ? '${(await _repository.loadImageTag()).prompt}\n\n$prompt'
+          ? '$prompt\n\n${(await _repository.loadImageTag()).prompt}'
           : prompt;
       final bytes = useLocal
           ? await LocalImageService.instance

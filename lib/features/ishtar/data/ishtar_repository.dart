@@ -204,11 +204,12 @@ class IshtarRepository {
   }
 
   /// Generates an image from [prompt] via the Pollinations image endpoint and
-  /// returns the raw image bytes. The selected [ImageTag] style prompt is
-  /// prepended to the user's request.
+  /// returns the raw image bytes. The user's subject is kept first and the
+  /// selected [ImageTag] style prompt is appended after it, so the subject
+  /// survives any length truncation.
   Future<Uint8List> generateImage(String prompt) async {
     final tag = await loadImageTag();
-    final fullPrompt = '${tag.prompt}\n\n$prompt';
+    final fullPrompt = '$prompt\n\n${tag.prompt}';
     // A fresh random seed per request so two identical prompts still produce
     // different images (Pollinations otherwise reuses a fixed seed + cache).
     final seed = Random().nextInt(1000000);
