@@ -351,12 +351,12 @@ class _IshtarPageState extends State<IshtarPage> {
     Object? error;
     try {
       final useLocal = LocalLlmService.instance.useLocal;
-      // Put the user's subject FIRST and append the tag's style prompt after
-      // it: the on-device tokenizer truncates to 77 tokens, so the subject
-      // must come first to survive truncation (the cloud path does the same
-      // inside IshtarRepository.generateImage).
+      // Local SD-Turbo is a one-step model that works best with a short,
+      // subject-focused prompt, so use the tag's short style descriptor
+      // (the long prompt is reserved for the cloud generator, which handles
+      // long prompts well). Subject first so it survives the 77-token cap.
       final imagePrompt = useLocal
-          ? '$prompt\n\n${(await _repository.loadImageTag()).prompt}'
+          ? '$prompt, ${(await _repository.loadImageTag()).shortPrompt}'
           : prompt;
       final bytes = useLocal
           ? await LocalImageService.instance

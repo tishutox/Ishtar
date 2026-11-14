@@ -8,6 +8,7 @@ enum ImageTag {
     icon: AppIcons.sparkles,
     label: 'Anime',
     description: 'Anime-style illustration.',
+    shortPrompt: 'anime style, 2d illustration',
     prompt:
         'Anime-style illustration with clean cel shading, bold expressive '
         'line art, large detailed eyes with glossy highlights, and vibrant '
@@ -25,6 +26,7 @@ enum ImageTag {
     icon: AppIcons.broomSparkles,
     label: 'Fantasy',
     description: 'Mythical worlds and creatures.',
+    shortPrompt: 'fantasy concept art',
     prompt:
         'Epic fantasy concept art with a sense of scale and wonder: dramatic '
         'landscapes, ancient castles, towering mountains, enchanted forests, '
@@ -43,6 +45,7 @@ enum ImageTag {
     icon: AppIcons.pepperChilli,
     label: 'Spicy',
     description: 'Suggestive, tasteful romance.',
+    shortPrompt: 'romantic, sensual',
     prompt:
         'Suggestive romantic artwork that is tasteful, teasing and elegant '
         'as well as explicit: emphasise detail over mood, atmosphere and  '
@@ -60,6 +63,7 @@ enum ImageTag {
     icon: AppIcons.flower,
     label: 'Realistic',
     description: 'Photorealistic images.',
+    shortPrompt: 'photorealistic, highly detailed',
     prompt:
         'Photorealistic image with true-to-life lighting, accurate textures, '
         'and natural colors. Simulate a high-end full-frame camera: sharp '
@@ -78,6 +82,7 @@ enum ImageTag {
     icon: AppIcons.feather,
     label: 'Traditional',
     description: 'Classical painting and drawing.',
+    shortPrompt: 'classical oil painting',
     prompt:
         'Classical traditional art in the style of a museum oil painting: '
         'visible brush strokes, rich layered glazes, and a muted historical '
@@ -94,6 +99,7 @@ enum ImageTag {
     icon: AppIcons.brainCircuit,
     label: 'Cyberpunk',
     description: 'Neon-drenched sci-fi.',
+    shortPrompt: 'cyberpunk, neon city',
     prompt:
         'Cyberpunk scene set in a rain-slick, neon-lit futuristic city at '
         'night: glowing holograms, dense signage, towering megastructures, '
@@ -111,6 +117,7 @@ enum ImageTag {
     icon: AppIcons.palette,
     label: 'Watercolor',
     description: 'Soft watercolor painting.',
+    shortPrompt: 'watercolor painting',
     prompt:
         'Soft watercolor painting with translucent, layered washes that blend '
         'gently into one another. Use a light, airy palette with delicate '
@@ -126,6 +133,7 @@ enum ImageTag {
     icon: AppIcons.square,
     label: 'Pixel Art',
     description: 'Retro pixel-art sprites.',
+    shortPrompt: '16-bit pixel art',
     prompt:
         'Retro pixel art in a crisp 16-bit video-game style: clean, '
         'grid-aligned pixels with no anti-aliasing or blur. Use a limited, '
@@ -141,6 +149,7 @@ enum ImageTag {
     icon: AppIcons.box,
     label: '3D Render',
     description: '3D rendered scenes.',
+    shortPrompt: 'high-end 3d render',
     prompt:
         'High-end 3D render with physically-based rendering: realistic PBR '
         'materials, accurate reflections, subsurface scattering where '
@@ -157,6 +166,7 @@ enum ImageTag {
     icon: AppIcons.pacMan,
     label: 'Retro',
     description: 'Vintage film photography.',
+    shortPrompt: 'vintage 35mm film photo',
     prompt:
         'Vintage film photograph look, like a grainy 35mm snapshot from the '
         '1970s-80s: faded, slightly warm colors, soft halation around '
@@ -173,6 +183,7 @@ enum ImageTag {
     icon: AppIcons.torus,
     label: 'Abstract',
     description: 'Abstract and experimental.',
+    shortPrompt: 'abstract art',
     prompt:
         'Abstract artwork built from bold geometric shapes, sweeping curves '
         'and expressive color fields. Combine flat planes of color with '
@@ -188,6 +199,7 @@ enum ImageTag {
     icon: AppIcons.squareUserRound,
     label: 'Portrait',
     description: 'Character portraits.',
+    shortPrompt: 'character portrait',
     prompt:
         'High-quality character portrait with a detailed, expressive face as '
         'the focal point. Use studio-quality lighting — a soft key light with '
@@ -206,10 +218,16 @@ enum ImageTag {
     required this.label,
     required this.description,
     required this.prompt,
+    required this.shortPrompt,
   });
 
   final String icon;
   final String label;
   final String description;
   final String prompt;
+
+  /// A short style descriptor for the on-device SD-Turbo model, which is a
+  /// one-step model that works best with brief, subject-focused prompts. The
+  /// long [prompt] is still used for the cloud generator.
+  final String shortPrompt;
 }
