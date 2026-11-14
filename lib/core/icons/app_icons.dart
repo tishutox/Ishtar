@@ -22,6 +22,7 @@ abstract final class AppIcons {
   static const chevronDown = 'chevron-down';
   static const chevronLeft = 'chevron-left';
   static const chevronRight = 'chevron-right';
+  static const chevronUp = 'chevron-up';
   static const circlePlus = 'circle-plus';
   static const circleUserRound = 'circle-user-round';
   static const cloud = 'cloud';

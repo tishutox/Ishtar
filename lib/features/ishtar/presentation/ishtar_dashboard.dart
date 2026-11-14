@@ -28,6 +28,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
   IshtarConversation? _active;
   bool _sidebarOpen = false;
   bool _loaded = false;
+  bool _fabMenuOpen = false;
   double _swipeDelta = 0;
   double _grabDelta = 0;
 
@@ -215,6 +216,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
     setState(() {
       _active = _repository.createConversation();
       _sidebarOpen = false;
+      _fabMenuOpen = false;
     });
   }
 
@@ -478,10 +480,9 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _buildAvatar(),
-                          const SizedBox(width: 12),
-                          _buildNewChatButton(),
+                          _buildFabMenu(),
                           const SizedBox(width: 12),
                           FilledButton(
                             onPressed: () => context.push('/settings'),
@@ -580,6 +581,56 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFabMenu() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.bottomCenter,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_fabMenuOpen) ...[
+            _buildAvatar(),
+            const SizedBox(height: 12),
+            _buildNewChatButton(),
+            const SizedBox(height: 12),
+          ],
+          _buildFabToggle(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFabToggle() {
+    return Tooltip(
+      message: 'More',
+      child: Material(
+        color: Colors.black,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => setState(() => _fabMenuOpen = !_fabMenuOpen),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: AnimatedRotation(
+                turns: _fabMenuOpen ? 0.5 : 0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                child: const AppIcon(
+                  AppIcons.chevronUp,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
