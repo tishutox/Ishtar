@@ -457,29 +457,37 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
             SizedBox(
               width: contentWidth,
               child: SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: Stack(
                   children: [
-                    _buildSidebarHeader(),
-                    Expanded(
-                      child: conversations.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No chats yet',
-                                style: TextStyle(color: Color(0xFF8E8E93)),
-                              ),
-                            )
-                          : ListView(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              children: _buildChatListItems(conversations),
-                            ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildSidebarHeader(),
+                        Expanded(
+                          child: conversations.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'No chats yet',
+                                    style: TextStyle(color: Color(0xFF8E8E93)),
+                                  ),
+                                )
+                              : ListView(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    8,
+                                    0,
+                                    8,
+                                    76,
+                                  ),
+                                  children: _buildChatListItems(conversations),
+                                ),
+                        ),
+                      ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           _buildFabMenu(),
@@ -588,7 +596,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
 
   Widget _buildFabMenu() {
     return AnimatedSize(
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 350),
       curve: Curves.easeOutCubic,
       alignment: Alignment.bottomCenter,
       child: Column(
@@ -621,7 +629,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
             child: Center(
               child: AnimatedRotation(
                 turns: _fabMenuOpen ? 0.5 : 0,
-                duration: const Duration(milliseconds: 220),
+                duration: const Duration(milliseconds: 350),
                 curve: Curves.easeInOut,
                 child: const AppIcon(
                   AppIcons.chevronUp,

@@ -3,8 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:lumii_quest/core/icons/app_icons.dart';
 import 'package:lumii_quest/features/profile/data/profile_repository.dart';
 import 'package:lumii_quest/features/profile/domain/user_profile.dart';
+import 'package:lumii_quest/features/profile/domain/zodiac.dart';
+import 'package:lumii_quest/features/profile/presentation/profile_header.dart';
 
-/// Public profile view reachable via the `lumiiquest://u/<username>` deep link.
+/// Public profile view reachable via the `lumiiquest://u/<username>` deep link
+/// or the `https://tishutox.github.io/Ishtar/app/u/<username>` web URL.
 class PublicProfilePage extends StatefulWidget {
   const PublicProfilePage({super.key, required this.username});
 
@@ -65,44 +68,17 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
     if (profile == null) {
       return const Center(child: Text('Profile not found.'));
     }
-    final avatarUrl = profile.avatarUrl;
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 44,
-              backgroundColor: const Color(0xFFE4E4E8),
-              backgroundImage: (avatarUrl == null || avatarUrl.isEmpty)
-                  ? null
-                  : NetworkImage(avatarUrl),
-              child: (avatarUrl == null || avatarUrl.isEmpty)
-                  ? const AppIcon(AppIcons.circleUserRound, size: 40)
-                  : null,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              profile.displayName,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '@${profile.username}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF8E8E93),
-              ),
-            ),
-            if (profile.bio.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(profile.bio, textAlign: TextAlign.center),
-            ],
-          ],
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ProfileHeader(
+          displayName: profile.displayName,
+          bio: profile.bio,
+          avatarUrl: profile.avatarUrl,
+          bannerUrl: profile.bannerUrl,
+          zodiac: ZodiacSign.fromName(profile.zodiac),
         ),
-      ),
+      ],
     );
   }
 }

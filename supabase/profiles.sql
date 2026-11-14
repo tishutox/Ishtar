@@ -31,6 +31,9 @@ add column if not exists profile_accent_color text not null default '#5860C3';
 alter table public.profiles
 add column if not exists keep_memories boolean not null default true;
 
+alter table public.profiles
+add column if not exists zodiac text;
+
 create unique index if not exists profiles_username_lower_unique
 on public.profiles (lower(username));
 
@@ -134,6 +137,39 @@ create trigger profiles_set_updated_at
 before update on public.profiles
 for each row execute function public.set_profile_updated_at();
 
+create or replace function public.zodiac_from_birthday(birthday text)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  m int;
+  d int;
+begin
+  if birthday is null or birthday = '' then
+    return null;
+  end if;
+  m := extract(month from birthday::date);
+  d := extract(day from birthday::date);
+  return case
+    when (m = 3 and d >= 21) or (m = 4 and d <= 19) then 'aries'
+    when (m = 4 and d >= 20) or (m = 5 and d <= 20) then 'taurus'
+    when (m = 5 and d >= 21) or (m = 6 and d <= 20) then 'gemini'
+    when (m = 6 and d >= 21) or (m = 7 and d <= 22) then 'cancer'
+    when (m = 7 and d >= 23) or (m = 8 and d <= 22) then 'leo'
+    when (m = 8 and d >= 23) or (m = 9 and d <= 22) then 'virgo'
+    when (m = 9 and d >= 23) or (m = 10 and d <= 22) then 'libra'
+    when (m = 10 and d >= 23) or (m = 11 and d <= 21) then 'scorpio'
+    when (m = 11 and d >= 22) or (m = 12 and d <= 21) then 'sagittarius'
+    when (m = 12 and d >= 22) or (m = 1 and d <= 19) then 'capricorn'
+    when (m = 1 and d >= 20) or (m = 2 and d <= 18) then 'aquarius'
+    when (m = 2 and d >= 19) or (m = 3 and d <= 20) then 'pisces'
+    else null
+  end;
+end;
+$$;
+
 create or replace function public.handle_new_user_profile()
 returns trigger
 language plpgsql
@@ -149,27 +185,51 @@ begin
   );
 
   begin
-    insert into public.profiles (id, username, display_name, avatar_url)
+    insert into public.profiles (id, username, display_name, avatar_url, zodiac)
     values (
       new.id,
       candidate_username,
       coalesce(nullif(new.raw_user_meta_data ->> 'display_name', ''), 'Ishtar member'),
-      nullif(new.raw_user_meta_data ->> 'avatar_url', '')
+      nullif(new.raw_user_meta_data ->> 'avatar_url', ''),
+      public.zodiac_from_birthday(new.raw_user_meta_data ->> 'birthday')
     )
     on conflict (id) do nothing;
   exception when unique_violation then
-    insert into public.profiles (id, username, display_name, avatar_url)
+    insert into public.profiles (id, username, display_name, avatar_url, zodiac)
     values (
       new.id,
       left(candidate_username, 11) || '_' || left(new.id::text, 8),
       coalesce(nullif(new.raw_user_meta_data ->> 'display_name', ''), 'Ishtar member'),
-      nullif(new.raw_user_meta_data ->> 'avatar_url', '')
+      nullif(new.raw_user_meta_data ->> 'avatar_url', ''),
+      public.zodiac_from_birthday(new.raw_user_meta_data ->> 'birthday')
     )
     on conflict (id) do nothing;
   end;
   return new;
 end;
 $$;
+
+create or replace function public.handle_user_birthday_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.raw_user_meta_data ->> 'birthday' is distinct from
+     old.raw_user_meta_data ->> 'birthday' then
+    update public.profiles
+    set zodiac = public.zodiac_from_birthday(new.raw_user_meta_data ->> 'birthday')
+    where id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_updated_profile on auth.users;
+create trigger on_auth_user_updated_profile
+after update on auth.users
+for each row execute function public.handle_user_birthday_change();
 
 drop trigger if exists on_auth_user_created_profile on auth.users;
 create trigger on_auth_user_created_profile
@@ -199,6 +259,14 @@ select
 from existing_users
 on conflict (id) do update set
   avatar_url = coalesce(public.profiles.avatar_url, excluded.avatar_url);
+
+update public.profiles p
+set zodiac = public.zodiac_from_birthday(a.raw_user_meta_data ->> 'birthday')
+from auth.users a
+where a.id = p.id
+  and p.zodiac is null
+  and a.raw_user_meta_data ->> 'birthday' is not null
+  and a.raw_user_meta_data ->> 'birthday' <> '';
 
 alter table public.profiles enable row level security;
 alter table public.profile_links enable row level security;

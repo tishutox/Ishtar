@@ -24,6 +24,7 @@ abstract final class AppIcons {
   static const chevronRight = 'chevron-right';
   static const chevronUp = 'chevron-up';
   static const circlePlus = 'circle-plus';
+  static const circleStop = 'circle-stop';
   static const circleUserRound = 'circle-user-round';
   static const cloud = 'cloud';
   static const code = 'code';
@@ -90,6 +91,7 @@ abstract final class AppIcons {
   static const power = 'power';
   static const refreshCcw = 'refresh-ccw';
   static const reply = 'reply';
+  static const ribbon = 'ribbon';
   static const rose = 'rose';
   static const save = 'save';
   static const search = 'search';
@@ -102,6 +104,7 @@ abstract final class AppIcons {
   static const sticker = 'sticker';
   static const toolCase = 'tool-case';
   static const trash = 'trash';
+  static const type = 'type';
   static const triangleAlert = 'triangle-alert';
   static const userMinus = 'user-round-minus';
   static const userPlus = 'user-round-plus';

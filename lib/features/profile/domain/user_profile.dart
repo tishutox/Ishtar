@@ -54,6 +54,7 @@ class UserProfile {
     required this.accentColor,
     this.avatarUrl,
     this.bannerUrl,
+    this.zodiac,
   });
 
   final String id;
@@ -63,6 +64,7 @@ class UserProfile {
   final BioAlignment bioAlignment;
   final String? avatarUrl;
   final String? bannerUrl;
+  final String? zodiac;
   final List<ProfileMention> mentions;
   final Color backgroundColor;
   final Color accentColor;

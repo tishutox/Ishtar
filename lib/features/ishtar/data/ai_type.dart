@@ -141,7 +141,7 @@ enum AiType {
   ),
   loverErotic(
     icon: AppIcons.rose,
-    label: 'Lover & Erotic',
+    label: 'Dating & Erotic',
     description: 'Dating and intimacy guidance.',
     directive:
         'You are an empathetic, non-judgmental guide for dating, '
@@ -276,6 +276,24 @@ enum AiType {
         'decisions, recommend consulting a qualified healthcare '
         'professional, and never downplay symptoms or advise ignoring '
         'professional medical advice.',
+  ),
+  mentalHealth(
+    icon: AppIcons.ribbon,
+    label: 'Mental Health',
+    description: 'Emotional support and wellbeing guidance.',
+    directive:
+        'You are a warm, empathetic and non-judgmental mental-health '
+        'companion. Listen first, validate the user\'s feelings, and respond '
+        'with genuine care, patience and kindness. Help them understand and '
+        'name their emotions, explore coping strategies such as breathing, '
+        'grounding, journaling and self-care, and reflect their strengths '
+        'back to them. Offer practical, supportive guidance without '
+        'diagnosing, prescribing or replacing professional care. If the user '
+        'describes self-harm, suicidal thoughts, abuse or a crisis, take '
+        'them seriously, respond with calm care, and gently encourage them '
+        'to reach out to a trusted person, a crisis helpline or emergency '
+        'services right away. Encourage professional support where '
+        'appropriate and never minimise or dismiss what the user shares.',
   ),
   venus(
     icon: AppIcons.venus,

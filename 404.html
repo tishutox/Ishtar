@@ -3,30 +3,142 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Opening Ishtar…</title>
+  <title>Ishtar</title>
+  <meta name="description" content="Ishtar profile">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --ink: #1a1a1a;
+      --muted: #8e8e93;
+      --border: #e4e4e8;
+      --primary: #000000;
+      --primary-press: #262626;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(440px, 100%);
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .avatar {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: var(--border);
+      margin: 0 auto;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 34px;
+      font-weight: 600;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    h1 { margin: 16px 0 0; font-size: 1.4rem; line-height: 1.2; }
+    .handle { color: var(--muted); margin: 4px 0 0; }
+    .bio { margin: 14px 0 0; line-height: 1.55; white-space: pre-wrap; overflow-wrap: break-word; }
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      color: #fff;
+      background: var(--primary);
+      border-radius: 12px;
+      padding: 12px 18px;
+      margin-top: 22px;
+      border: none;
+      cursor: pointer;
+    }
+    .cta:hover { background: var(--primary-press); }
+    .home { display: inline-block; margin-top: 16px; color: var(--muted); font-size: 0.9rem; }
+  </style>
 </head>
 <body>
-  <p>Opening Ishtar…</p>
+  <main class="card" id="root"></main>
   <script>
-    (() => {
-      const appPrefix = '/Ishtar/app/';
-      const path = window.location.pathname;
-      if (!path.startsWith(appPrefix)) {
+    (function () {
+      var root = document.getElementById('root');
+      var path = window.location.pathname || '';
+
+      var match = path.match(/^\/Ishtar\/app\/u\/([^/]+)/);
+      if (!match) {
         window.location.replace('/Ishtar/');
         return;
       }
 
-      const relativePath = path.slice(appPrefix.length);
-      sessionStorage.setItem(
-        'lumii-restore-path',
-        `${path}${window.location.search}${window.location.hash}`,
-      );
+      var username = decodeURIComponent(match[1]).trim();
 
-      if (relativePath.startsWith('u/')) {
-        window.location.href = `lumiiquest://${relativePath}`;
+      var SUPABASE_URL = 'https://lclcpnecbejxzbbzygwt.supabase.co';
+      var SUPABASE_ANON_KEY = 'sb_publishable_P-RLE2XWuIg3wYzgRwhaTg_qe9mW27n';
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
       }
 
-      window.setTimeout(() => window.location.replace(appPrefix), 650);
+      function appUrl() {
+        return 'lumiiquest://u/' + encodeURIComponent(username);
+      }
+
+      function renderProfile(profile) {
+        var avatar = profile && profile.avatar_url;
+        var name = profile && profile.display_name ? profile.display_name : username;
+        var bio = profile && profile.bio ? profile.bio : '';
+        root.innerHTML =
+          '<div class="avatar">' +
+            (avatar ? '<img src="' + escapeHtml(avatar) + '" alt="">' : '&#128100;') +
+          '</div>' +
+          '<h1>' + escapeHtml(name) + '</h1>' +
+          '<p class="handle">@' + escapeHtml(username) + '</p>' +
+          (bio ? '<p class="bio">' + escapeHtml(bio) + '</p>' : '') +
+          '<br>' +
+          '<a class="cta" href="' + appUrl() + '">Open in Ishtar</a>';
+      }
+
+      function renderMissing() {
+        root.innerHTML =
+          '<div class="avatar">&#128100;</div>' +
+          '<h1>Profile not found</h1>' +
+          '<p class="handle">@' + escapeHtml(username) + '</p>' +
+          '<br>' +
+          '<a class="cta" href="' + appUrl() + '">Open in Ishtar</a>' +
+          '<br><a class="home" href="/Ishtar/">Ishtar home</a>';
+      }
+
+      var client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      client
+        .from('profiles')
+        .select('username, display_name, bio, avatar_url')
+        .ilike('username', username)
+        .maybeSingle()
+        .then(function (result) {
+          if (result.error || !result.data) {
+            renderMissing();
+            return;
+          }
+          renderProfile(result.data);
+        })
+        .catch(function () {
+          renderMissing();
+        });
     })();
   </script>
 </body>

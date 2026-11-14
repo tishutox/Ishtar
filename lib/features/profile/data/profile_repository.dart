@@ -62,6 +62,7 @@ class ProfileRepository {
       bioAlignment: BioAlignment.fromDatabase(row['bio_alignment'] as String?),
       avatarUrl: row['avatar_url'] as String?,
       bannerUrl: row['banner_url'] as String?,
+      zodiac: row['zodiac'] as String?,
       mentions: mentions,
       backgroundColor: profileColorFromHex(
         row['profile_background_color'] as String?,

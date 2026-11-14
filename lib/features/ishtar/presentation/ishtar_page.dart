@@ -817,16 +817,12 @@ class _IshtarMediaInputBar extends StatelessWidget {
               ),
             ),
             if (isGenerating)
-              AnimatedRotation(
-                turns: 0.125,
-                duration: const Duration(milliseconds: 200),
-                child: _CircleIconButton(
-                  tooltip: 'Stop',
-                  icon: AppIcons.circlePlus,
-                  backgroundColor: primary,
-                  iconColor: Colors.white,
-                  onPressed: onCancel,
-                ),
+              _CircleIconButton(
+                tooltip: 'Stop',
+                icon: AppIcons.circleStop,
+                backgroundColor: primary,
+                iconColor: Colors.white,
+                onPressed: onCancel,
               )
             else if (hasText)
               _CircleIconButton(
@@ -1449,7 +1445,7 @@ class _AiSettingsSheetState extends State<_AiSettingsSheet> {
                 runSpacing: 10,
                 children: [
                   _ChipTag(
-                    icon: AppIcons.messageSquareText,
+                    icon: AppIcons.type,
                     label: 'Text',
                     selected: !isImage,
                     onTap: () => setState(() => _genType = GenType.text),
