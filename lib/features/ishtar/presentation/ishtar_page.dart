@@ -351,12 +351,18 @@ class _IshtarPageState extends State<IshtarPage> {
     Object? error;
     try {
       final useLocal = LocalLlmService.instance.useLocal;
+      // The cloud path prepends the selected image tag's style prompt inside
+      // IshtarRepository.generateImage; the local path must do the same so the
+      // tag is honored by the on-device model too.
+      final imagePrompt = useLocal
+          ? '${(await _repository.loadImageTag()).prompt}\n\n$prompt'
+          : prompt;
       final bytes = useLocal
           ? await LocalImageService.instance
-              .generateImage(prompt)
+              .generateImage(imagePrompt)
               .timeout(const Duration(minutes: 30))
           : await _repository
-              .generateImage(prompt)
+              .generateImage(imagePrompt)
               .timeout(const Duration(seconds: 150));
       if (!mounted || generationId != _generationId) return;
       final dir = await _mediaDir();

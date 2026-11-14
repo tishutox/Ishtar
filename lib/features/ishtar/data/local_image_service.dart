@@ -218,12 +218,13 @@ class LocalImageService {
     await _checkpoint('loading UNet');
     final unet = await _session(_unetName);
     final latentShape = _sampleShape(unet);
-    final latent = _randn(_product(latentShape));
+    // SD-Turbo is a distilled one-step model. Its EulerAncestralDiscrete
+    // scheduler (timestep_spacing="trailing", num_inference_steps=1) starts
+    // from noise scaled to sigma_max and recovers x0 = latent - sigma*epsilon.
+    const sigmaMax = 14.6146;
+    final latent = _scaleBy(_randn(_product(latentShape)), sigmaMax);
 
-    // 3) UNet: single denoising step.
-    //    ITERATION-1 TODO: verify the SD-Turbo timestep schedule. SD-Turbo
-    //    runs EulerAncestralDiscrete with `timestep_spacing="trailing"` and
-    //    1..4 steps; below we use t=999 and a plain DDPM epsilon->x0 step.
+    // 3) UNet: single denoising step (timestep 999 = trailing one-step).
     final unetInputs = _unetInputs(unet, latent, 999, textEmb);
     final unetOutputs = unet.run(OrtRunOptions(), unetInputs);
     final noise = _toFloat32(unetOutputs[0]?.value);
@@ -236,8 +237,8 @@ class LocalImageService {
     _releaseSession(_unetName);
     await _checkpoint('UNet done');
 
-    // 4) Denoise to x0.
-    final denoised = _denoise(latent, noise, 999);
+    // 4) Denoise to x0 (pred_original_sample = latent - sigma * epsilon).
+    final denoised = _denoise(latent, noise, sigmaMax);
 
     // 5) VAE decoder: latent_sample -> sample.
     //    SD VAE latent scale factor 0.18215.
@@ -325,24 +326,13 @@ class LocalImageService {
 
   int _product(List<int> shape) => shape.fold(1, (a, b) => a * b);
 
-  /// DDPM epsilon-prediction -> x0.
-  /// ITERATION-1 TODO: replace with the exact SD-Turbo sigma schedule.
-  Float32List _denoise(Float32List latent, Float32List noise, int timestep) {
-    const steps = 1000;
-    const betaStart = 0.00085;
-    const betaEnd = 0.012;
-    final alphaBar = List<double>.filled(steps, 1.0);
-    for (var i = 0; i < steps; i++) {
-      final beta = betaStart + (betaEnd - betaStart) * i / (steps - 1);
-      final alpha = 1 - beta;
-      alphaBar[i] = (i == 0 ? 1 : alphaBar[i - 1]) * alpha;
-    }
-    final ab = alphaBar[timestep];
-    final sqrtAb = math.sqrt(ab);
-    final sqrtOneMinusAb = math.sqrt(1 - ab);
+  /// SD-Turbo one-step epsilon-prediction -> x0: `x0 = latent - sigma*epsilon`,
+  /// where `latent` is already scaled by `sigma` (the EulerAncestralDiscrete
+  /// step with prediction_type="epsilon" collapses to this in a single step).
+  Float32List _denoise(Float32List latent, Float32List noise, double sigma) {
     final out = Float32List(latent.length);
     for (var i = 0; i < latent.length; i++) {
-      out[i] = (latent[i] - sqrtOneMinusAb * noise[i]) / sqrtAb;
+      out[i] = latent[i] - sigma * noise[i];
     }
     return out;
   }
