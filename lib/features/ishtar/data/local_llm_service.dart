@@ -240,30 +240,34 @@ class LocalLlmService {
     } catch (_) {}
   }
 
-  /// Translates [text] to English for the on-device image prompt. SD-Turbo's
-  /// CLIP text encoder only understands English, so a non-English subject is
-  /// otherwise ignored. Returns [text] unchanged when the model is unavailable
-  /// or the translation fails.
-  Future<String> translateToEnglish(String text) async {
+  /// Rewrites [text] into a concise, unambiguous English image-generation
+  /// prompt (and translates non-English input). SD-Turbo's CLIP follows
+  /// explicit prompts best, so vague wording ("full body", "child", "their")
+  /// is expanded and the subject count is made explicit. Returns [text]
+  /// unchanged when the model is unavailable or rewriting fails.
+  Future<String> toImagePrompt(String text) async {
     try {
       if (!await isDownloaded()) return text;
       final out = await chat([
         {
           'role': 'user',
           'content':
-              'Translate the following text to English. If it is already in '
-              'English, return it unchanged. Output only the translation, '
-              'without quotes or extra wording:\n\n$text',
+              'Rewrite this into one concise English prompt for an image '
+              'generator. Make the subject explicit and singular unless '
+              'otherwise stated, keep any framing hint (full body / upper '
+              'body / close-up), and expand vague words. Output only the '
+              'prompt:\n\n$text',
         },
       ]);
       final cleaned = out
           .trim()
           .replaceFirst(
-            RegExp(r'^(Here is the translation:?\s*)', caseSensitive: false),
+            RegExp(r'^(Here is the (?:translation|prompt):?\s*)',
+                caseSensitive: false),
             '',
           )
           .replaceFirst(
-            RegExp(r'^(Translation:?\s*)', caseSensitive: false),
+            RegExp(r'^(Translation|Prompt):?\s*', caseSensitive: false),
             '',
           )
           .replaceAll(RegExp(r'^["\u201C\u201D]+|["\u201C\u201D]+$'), '')
