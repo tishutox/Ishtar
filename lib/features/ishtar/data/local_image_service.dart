@@ -234,45 +234,67 @@ class LocalImageService {
     await _checkpoint('loading UNet');
     final unet = await _session(_unetName);
     final latentShape = _sampleShape(unet);
-    // SD-Turbo one-step inference, per the official WebNN sample
-    // (microsoft/webnn-developer-preview/demos/sd-turbo):
-    //   sigma  = 14.6146
-    //   latent = randn * sigma                    (noise init)
-    //   scaled = latent / sqrt(sigma^2 + 1)       (scale_model_inputs -> UNet)
-    //   eps    = unet(scaled, t=999, ...)
-    //   x0     = latent - sigma * eps             (Euler-A step, gamma=0)
-    //   vae_in = x0 / 0.18215
-    const sigma = 14.6146;
-    final latent = _scaleBy(_randn(_product(latentShape)), sigma);
-    final scaled = _scaleBy(latent, 1 / math.sqrt(sigma * sigma + 1));
 
-    // 3) UNet: single denoising step (timestep 999).
+    // SD-Turbo multi-step denoising (EulerAncestralDiscreteScheduler,
+    // trailing spacing). Each step is one UNet forward pass; more steps
+    // improve anatomy/detail at the cost of time (~30s for 1 step, ~2min for
+    // 4 on-device).
+    const steps = 4;
+    final timesteps = _timestepsForSteps(steps);
+    final allSigmas = _eulerAncestralSigmas();
+    final sigmas = <double>[
+      for (final t in timesteps) allSigmas[t],
+      0.0, // final sigma_min
+    ];
+    var latent = _scaleBy(_randn(_product(latentShape)), sigmas[0]);
+
     print('[Ishtar] local-image: UNet inputs=${unet.inputNames} '
         'shapes=${unet.inputShapes} types=${unet.inputElementTypes}');
-    final unetInputs = _unetInputs(unet, scaled, 999, textEmb);
-    final unetOutputs = unet.run(OrtRunOptions(), unetInputs);
-    final noise = _toFloat32(unetOutputs[0]?.value);
-    for (final v in unetInputs.values) {
-      v.release();
-    }
-    for (final o in unetOutputs) {
-      o?.release();
+    print('[Ishtar] local-image: steps=$steps timesteps=$timesteps '
+        'sigmas=$sigmas');
+
+    // 3) UNet: iterative denoising.
+    for (var i = 0; i < steps; i++) {
+      final sigma = sigmas[i];
+      final sigmaNext = sigmas[i + 1];
+      final scaled = _scaleBy(latent, 1 / math.sqrt(sigma * sigma + 1));
+      final unetInputs = _unetInputs(unet, scaled, timesteps[i], textEmb);
+      final unetOutputs = unet.run(OrtRunOptions(), unetInputs);
+      final noise = _toFloat32(unetOutputs[0]?.value);
+      for (final v in unetInputs.values) {
+        v.release();
+      }
+      for (final o in unetOutputs) {
+        o?.release();
+      }
+
+      // pred_original_sample = latent - sigma * epsilon.
+      final predOriginal = _denoise(latent, noise, sigma);
+
+      if (i < steps - 1) {
+        // EulerAncestral: re-noise before the next step.
+        final sigmaUp = math.sqrt(
+          sigmaNext * sigmaNext * (sigma * sigma - sigmaNext * sigmaNext) /
+              (sigma * sigma),
+        );
+        latent = _addScaled(
+          predOriginal,
+          _randn(_product(latentShape)),
+          sigmaUp,
+        );
+      } else {
+        latent = predOriginal;
+      }
     }
     _releaseSession(_unetName);
     await _checkpoint('UNet done');
 
-    // 4) Denoise to x0 (pred_original_sample = latent - sigma * epsilon).
-    //    Note: the step uses the UNSCALED latent (randn*sigma) as `sample`,
-    //    while the UNet received the scaled `latent_model_input`.
-    final denoised = _denoise(latent, noise, sigma);
-
-    // 5) VAE decoder: latent_sample -> sample.
-    //    SD VAE latent scale factor 0.18215.
+    // 4) Denoised latent -> VAE decoder (scale factor 0.18215).
     await _checkpoint('loading VAE');
     final vae = await _session(_vaeName);
     final vaeInput = _floatTensor(
       vae.inputElementTypes.first,
-      _scaleBy(denoised, 1 / 0.18215),
+      _scaleBy(latent, 1 / 0.18215),
       latentShape,
     );
     final vaeOutputs = vae.run(
@@ -352,9 +374,7 @@ class LocalImageService {
 
   int _product(List<int> shape) => shape.fold(1, (a, b) => a * b);
 
-  /// SD-Turbo one-step epsilon-prediction -> x0: `x0 = latent - sigma*epsilon`,
-  /// where `latent` is already scaled by `sigma` (the EulerAncestralDiscrete
-  /// step with prediction_type="epsilon" collapses to this in a single step).
+  /// SD-Turbo one-step epsilon-prediction -> x0: `x0 = latent - sigma*epsilon`.
   Float32List _denoise(Float32List latent, Float32List noise, double sigma) {
     final out = Float32List(latent.length);
     for (var i = 0; i < latent.length; i++) {
@@ -369,6 +389,38 @@ class LocalImageService {
       out[i] = data[i] * factor;
     }
     return out;
+  }
+
+  Float32List _addScaled(Float32List a, Float32List b, double factor) {
+    final out = Float32List(a.length);
+    for (var i = 0; i < a.length; i++) {
+      out[i] = a[i] + factor * b[i];
+    }
+    return out;
+  }
+
+  /// SD-Turbo's EulerAncestralDiscreteScheduler timesteps for [steps] steps
+  /// (trailing spacing), e.g. 4 -> [999, 749, 499, 249].
+  List<int> _timestepsForSteps(int steps) {
+    final stepRatio = 1000 ~/ steps;
+    return [for (var i = steps; i >= 1; i--) i * stepRatio - 1];
+  }
+
+  /// The scheduler sigma for each of the 1000 timesteps, using the
+  /// scaled_linear beta schedule (beta_start=0.00085, beta_end=0.012).
+  /// sigma(t) = sqrt((1 - alpha_cumprod(t)) / alpha_cumprod(t)).
+  List<double> _eulerAncestralSigmas() {
+    final sqrtStart = math.sqrt(0.00085);
+    final sqrtEnd = math.sqrt(0.012);
+    var alphaCumprod = 1.0;
+    final sigmas = <double>[];
+    for (var i = 0; i < 1000; i++) {
+      final v = sqrtStart + (sqrtEnd - sqrtStart) * (i / 999.0);
+      final beta = v * v;
+      alphaCumprod *= (1.0 - beta);
+      sigmas.add(math.sqrt((1.0 - alphaCumprod) / alphaCumprod));
+    }
+    return sigmas;
   }
 
   Uint8List _vaeToJpeg(dynamic vaeOutput) {
