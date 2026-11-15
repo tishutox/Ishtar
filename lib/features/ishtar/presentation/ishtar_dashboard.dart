@@ -484,29 +484,36 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
                       ],
                     ),
                     Positioned(
-                      right: 16,
-                      bottom: 16,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          _buildFabMenu(),
-                          const SizedBox(width: 12),
-                          FilledButton(
-                            onPressed: () => context.push('/settings'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 40),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        color: _sidebarColor,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _buildFabMenu(),
+                            const SizedBox(width: 12),
+                            FilledButton(
+                              onPressed: () => context.push('/settings'),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(0, 40),
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                ),
+                                shape: const StadiumBorder(),
                               ),
-                              shape: const StadiumBorder(),
+                              child: const Text(
+                                'Settings',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
                             ),
-                            child: const Text(
-                              'Settings',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -595,21 +602,39 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
   }
 
   Widget _buildFabMenu() {
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.bottomCenter,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          if (_fabMenuOpen) ...[
+          Positioned(
+            bottom: 52,
+            left: 0,
+            right: 0,
+            child: _buildRevealItems(),
+          ),
+          _buildFabToggle(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRevealItems() {
+    return AnimatedOpacity(
+      opacity: _fabMenuOpen ? 1 : 0,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+      child: IgnorePointer(
+        ignoring: !_fabMenuOpen,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             _buildAvatar(),
             const SizedBox(height: 12),
             _buildNewChatButton(),
-            const SizedBox(height: 12),
           ],
-          _buildFabToggle(),
-        ],
+        ),
       ),
     );
   }
@@ -629,7 +654,7 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
             child: Center(
               child: AnimatedRotation(
                 turns: _fabMenuOpen ? 0.5 : 0,
-                duration: const Duration(milliseconds: 350),
+                duration: const Duration(milliseconds: 500),
                 curve: Curves.easeInOut,
                 child: const AppIcon(
                   AppIcons.chevronUp,
