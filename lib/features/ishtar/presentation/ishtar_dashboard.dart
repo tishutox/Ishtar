@@ -484,8 +484,17 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
                       ],
                     ),
                     Positioned(
-                      right: 16,
+                      left: 0,
+                      right: 0,
                       bottom: 0,
+                      child: Container(
+                        color: _sidebarColor,
+                        height: 64,
+                      ),
+                    ),
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
                       child: _buildFabMenu(),
                     ),
                   ],
@@ -580,30 +589,26 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
       children: [
         _buildRevealItems(),
         const SizedBox(height: 12),
-        Container(
-          color: _sidebarColor,
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildFabToggle(),
-              const SizedBox(width: 12),
-              FilledButton(
-                onPressed: () => context.push('/settings'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 40),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Text(
-                  'Settings',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildFabToggle(),
+            const SizedBox(width: 12),
+            FilledButton(
+              onPressed: () => context.push('/settings'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: const StadiumBorder(),
               ),
-            ],
-          ),
+              child: const Text(
+                'Settings',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         ),
       ],
     );
