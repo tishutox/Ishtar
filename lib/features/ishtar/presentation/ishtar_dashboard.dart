@@ -484,37 +484,9 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
                       ],
                     ),
                     Positioned(
-                      left: 0,
-                      right: 0,
+                      right: 16,
                       bottom: 0,
-                      child: Container(
-                        color: _sidebarColor,
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            _buildFabMenu(),
-                            const SizedBox(width: 12),
-                            FilledButton(
-                              onPressed: () => context.push('/settings'),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size(0, 40),
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                ),
-                                shape: const StadiumBorder(),
-                              ),
-                              child: const Text(
-                                'Settings',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      child: _buildFabMenu(),
                     ),
                   ],
                 ),
@@ -602,21 +574,38 @@ class _IshtarDashboardState extends State<IshtarDashboard> {
   }
 
   Widget _buildFabMenu() {
-    return SizedBox(
-      width: 40,
-      height: 40,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            bottom: 52,
-            left: 0,
-            right: 0,
-            child: _buildRevealItems(),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildRevealItems(),
+        const SizedBox(height: 12),
+        Container(
+          color: _sidebarColor,
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildFabToggle(),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: () => context.push('/settings'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text(
+                  'Settings',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ),
-          _buildFabToggle(),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
