@@ -193,6 +193,9 @@ class LocalImageService {
     final tokenizerJson = await _file(_tokenizerName).then((f) => f.readAsString());
     final tokenizer = ClipTokenizer.fromJson(tokenizerJson);
     final inputIds = tokenizer.tokenize(prompt);
+    print('[Ishtar] local-image: prompt="$prompt"');
+    print('[Ishtar] local-image: tokenIds=${inputIds.take(16).toList()} '
+        '(n=${inputIds.length})');
     await _checkpoint('tokenized');
 
     // 1) Text encoder: input_ids -> last_hidden_state.
@@ -206,7 +209,20 @@ class LocalImageService {
       OrtRunOptions(),
       {encoder.inputNames.first: encInput},
     );
-    final textEmb = _toFloat32(encOutputs[0]?.value);
+    // Prefer last_hidden_state by name — some CLIP exports also emit a
+    // pooler_output as a second output, so taking index 0 alone is fragile.
+    var textEmb = _toFloat32(encOutputs[0]?.value);
+    for (var i = 0; i < encoder.outputNames.length; i++) {
+      if (encoder.outputNames[i].toLowerCase().contains('hidden')) {
+        textEmb = _toFloat32(encOutputs[i]?.value);
+        break;
+      }
+    }
+    print('[Ishtar] local-image: text-encoder outputs=${encoder.outputNames} '
+        'shapes=${encoder.outputShapes}');
+    print('[Ishtar] local-image: textEmb len=${textEmb.length} '
+        'head=${textEmb.take(6).toList()} '
+        'anyNonZero=${textEmb.any((v) => v != 0)}');
     encInput.release();
     for (final o in encOutputs) {
       o?.release();
@@ -231,6 +247,8 @@ class LocalImageService {
     final scaled = _scaleBy(latent, 1 / math.sqrt(sigma * sigma + 1));
 
     // 3) UNet: single denoising step (timestep 999).
+    print('[Ishtar] local-image: UNet inputs=${unet.inputNames} '
+        'shapes=${unet.inputShapes} types=${unet.inputElementTypes}');
     final unetInputs = _unetInputs(unet, scaled, 999, textEmb);
     final unetOutputs = unet.run(OrtRunOptions(), unetInputs);
     final noise = _toFloat32(unetOutputs[0]?.value);
