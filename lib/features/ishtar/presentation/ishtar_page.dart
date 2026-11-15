@@ -355,8 +355,11 @@ class _IshtarPageState extends State<IshtarPage> {
       // subject-focused prompt, so use the tag's short style descriptor
       // (the long prompt is reserved for the cloud generator, which handles
       // long prompts well). Subject first so it survives the 77-token cap.
+      // The CLIP encoder only understands English, so translate the subject.
       final imagePrompt = useLocal
-          ? '$prompt, ${(await _repository.loadImageTag()).shortPrompt}'
+          ? '${await LocalLlmService.instance.translateToEnglish(prompt)}, '
+              '${(await _repository.loadImageTag()).shortPrompt}, '
+              'highly detailed, high quality'
           : prompt;
       final bytes = useLocal
           ? await LocalImageService.instance

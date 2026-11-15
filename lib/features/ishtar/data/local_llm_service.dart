@@ -239,4 +239,38 @@ class LocalLlmService {
       if (file.existsSync()) await file.delete();
     } catch (_) {}
   }
+
+  /// Translates [text] to English for the on-device image prompt. SD-Turbo's
+  /// CLIP text encoder only understands English, so a non-English subject is
+  /// otherwise ignored. Returns [text] unchanged when the model is unavailable
+  /// or the translation fails.
+  Future<String> translateToEnglish(String text) async {
+    try {
+      if (!await isDownloaded()) return text;
+      final out = await chat([
+        {
+          'role': 'user',
+          'content':
+              'Translate the following text to English. If it is already in '
+              'English, return it unchanged. Output only the translation, '
+              'without quotes or extra wording:\n\n$text',
+        },
+      ]);
+      final cleaned = out
+          .trim()
+          .replaceFirst(
+            RegExp(r'^(Here is the translation:?\s*)', caseSensitive: false),
+            '',
+          )
+          .replaceFirst(
+            RegExp(r'^(Translation:?\s*)', caseSensitive: false),
+            '',
+          )
+          .replaceAll(RegExp(r'^["\u201C\u201D]+|["\u201C\u201D]+$'), '')
+          .trim();
+      return cleaned.isEmpty ? text : cleaned;
+    } catch (_) {
+      return text;
+    }
+  }
 }
