@@ -52,26 +52,24 @@ class ClipTokenizer {
     // Normalizer: NFC (identity for ASCII), collapse whitespace, lowercase.
     var normalized = text.replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
-    // GPT-2 byte-level encoding: map each UTF-8 byte to a Unicode char.
     final byteToUnicode = _bytesToUnicode();
-    final encoded = utf8
-        .encode(normalized)
-        .map((b) => byteToUnicode[b]!)
-        .join();
 
-    // GPT-2 regex split into word pieces.
+    // The model's pre-tokenizer splits the RAW text first (its `Split` step
+    // removes whitespace between words) and only then byte-encodes each
+    // piece. Encoding the whole string first would turn every space into a
+    // standalone "Ġ" token the model was never trained on.
     final pattern = RegExp(
       r"'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+",
       unicode: true,
     );
-    final pieces = pattern
-        .allMatches(encoded)
-        .map((m) => m.group(0)!)
-        .toList();
 
     final ids = <int>[];
-    for (final piece in pieces) {
-      ids.addAll(_bpe(piece));
+    for (final match in pattern.allMatches(normalized)) {
+      final encoded = utf8
+          .encode(match.group(0)!)
+          .map((b) => byteToUnicode[b]!)
+          .join();
+      ids.addAll(_bpe(encoded));
     }
 
     // Post-processor (RobertaProcessing): wrap with SOT/EOT.
